@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hide-n-Seek Presence Tracker",
+        "description": "Set up presence tracking using triangulation from multiple sensors.",
+        "data": {
+          "update_interval": "Update interval (seconds)",
+          "smoothing": "Position smoothing method",
+          "confidence_threshold": "Minimum confidence threshold (0-1)"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Hide-n-Seek Options",
+        "description": "Configure Hide-n-Seek settings.",
+        "data": {
+          "update_interval": "Update interval (seconds)",
+          "smoothing": "Position smoothing method",
+          "confidence_threshold": "Minimum confidence threshold (0-1)"
+        }
+      }
+    }
+  },
+  "services": {
+    "calibrate_sensor": {
+      "name": "Calibrate Sensor",
+      "description": "Calibrate a sensor for better accuracy.",
+      "fields": {
+        "sensor_id": {
+          "name": "Sensor ID",
+          "description": "The ID of the sensor to calibrate."
+        }
+      }
+    },
+    "create_zone": {
+      "name": "Create Zone",
+      "description": "Create a new tracking zone.",
+      "fields": {
+        "name": {
+          "name": "Zone Name",
+          "description": "Name of the zone."
+        },
+        "coordinates": {
+          "name": "Coordinates",
+          "description": "List of [x, y] coordinates defining the zone polygon."
+        }
+      }
+    },
+    "delete_zone": {
+      "name": "Delete Zone",
+      "description": "Delete a tracking zone.",
+      "fields": {
+        "zone_id": {
+          "name": "Zone ID",
+          "description": "The ID of the zone to delete."
+        }
+      }
+    }
+  }
+}

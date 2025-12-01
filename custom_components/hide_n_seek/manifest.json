@@ -1,0 +1,16 @@
+{
+  "domain": "hide_n_seek",
+  "name": "Hide-n-Seek Presence Tracker",
+  "codeowners": ["@BenJaminBMorin"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/BenJaminBMorin/hide-n-seek",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/BenJaminBMorin/hide-n-seek/issues",
+  "requirements": [
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "paho-mqtt>=1.6.1"
+  ],
+  "version": "0.1.0"
+}
