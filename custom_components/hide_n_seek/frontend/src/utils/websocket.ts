@@ -1,4 +1,4 @@
-import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor, FloorPlan, Room } from '../types';
+import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor, FloorPlan, Room, Person } from '../types';
 
 export class HideNSeekWebSocket {
   private ws: WebSocket | null = null;
@@ -330,6 +330,93 @@ export class HideNSeekWebSocket {
       this.callbacks.set(id, (response) => {
         if (response.success === false) {
           reject(new Error(response.error?.message || 'Failed to delete room'));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  async getPersons(): Promise<Person[]> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/get_persons',
+        config_entry_id: this.configEntryId,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to get persons'));
+        } else {
+          resolve(response.result.persons);
+        }
+      });
+    });
+  }
+
+  async createPerson(personData: {
+    name: string;
+    default_device_id: string;
+    linked_device_ids?: string[];
+    color?: string;
+    avatar?: string;
+  }): Promise<Person> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/update_person',
+        config_entry_id: this.configEntryId,
+        person_data: personData,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to create person'));
+        } else {
+          resolve(response.result);
+        }
+      });
+    });
+  }
+
+  async updatePerson(
+    personId: string,
+    personData: {
+      name?: string;
+      default_device_id?: string;
+      linked_device_ids?: string[];
+      color?: string;
+      avatar?: string;
+    }
+  ): Promise<Person> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/update_person',
+        config_entry_id: this.configEntryId,
+        person_id: personId,
+        person_data: personData,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to update person'));
+        } else {
+          resolve(response.result);
+        }
+      });
+    });
+  }
+
+  async deletePerson(personId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/delete_person',
+        config_entry_id: this.configEntryId,
+        person_id: personId,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to delete person'));
         } else {
           resolve();
         }
