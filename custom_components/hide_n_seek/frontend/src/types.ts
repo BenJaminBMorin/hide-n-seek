@@ -103,6 +103,10 @@ export interface Wall {
   start: [number, number];
   end: [number, number];
   thickness: number;
+  color?: string;
+  type?: 'standard' | 'load_bearing' | 'glass' | 'partition';
+  doors?: Array<{ position: number; width: number }>; // position: 0-1 along wall
+  windows?: Array<{ position: number; width: number; height: number }>;
 }
 
 export interface FloorPlan {

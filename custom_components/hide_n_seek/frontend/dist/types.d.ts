@@ -94,6 +94,17 @@ export interface Wall {
     start: [number, number];
     end: [number, number];
     thickness: number;
+    color?: string;
+    type?: 'standard' | 'load_bearing' | 'glass' | 'partition';
+    doors?: Array<{
+        position: number;
+        width: number;
+    }>;
+    windows?: Array<{
+        position: number;
+        width: number;
+        height: number;
+    }>;
 }
 export interface FloorPlan {
     rooms: Room[];

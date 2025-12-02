@@ -9,7 +9,7 @@ interface MapCanvasProps {
   selectedZone: Zone | null;
   onZoneClick: (zone: Zone) => void;
   onCanvasClick: (point: Point) => void;
-  editMode: 'view' | 'draw' | 'edit' | 'draw_room';
+  editMode: 'view' | 'draw' | 'edit' | 'draw_room' | 'draw_wall' | 'edit_wall';
   drawingPoints: Point[];
   floorPlan?: FloorPlan;
   showFloorPlan?: boolean;
@@ -390,6 +390,49 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       drawDrawingZone(ctx, drawingPoints);
     }
 
+    // Draw wall being drawn
+    if (editMode === 'draw_wall' && drawingPoints.length > 0) {
+      const screenPoints = drawingPoints.map((p) => worldToScreen(p.x, p.y));
+
+      // Draw first point
+      ctx.fillStyle = '#FF9800';
+      ctx.beginPath();
+      ctx.arc(screenPoints[0].x, screenPoints[0].y, 6, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Draw line if we have 2 points
+      if (screenPoints.length === 2) {
+        ctx.strokeStyle = '#FF9800';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(screenPoints[0].x, screenPoints[0].y);
+        ctx.lineTo(screenPoints[1].x, screenPoints[1].y);
+        ctx.stroke();
+
+        // Draw second point
+        ctx.fillStyle = '#FF9800';
+        ctx.beginPath();
+        ctx.arc(screenPoints[1].x, screenPoints[1].y, 6, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Draw length label
+        const dx = drawingPoints[1].x - drawingPoints[0].x;
+        const dy = drawingPoints[1].y - drawingPoints[0].y;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const midX = (screenPoints[0].x + screenPoints[1].x) / 2;
+        const midY = (screenPoints[0].y + screenPoints[1].y) / 2;
+
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 3;
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeText(`${length.toFixed(2)}m`, midX, midY - 15);
+        ctx.fillText(`${length.toFixed(2)}m`, midX, midY - 15);
+      }
+    }
+
     // Draw sensors
     sensors.forEach((sensor) => drawSensor(ctx, sensor));
 
@@ -413,7 +456,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       // Middle click or Ctrl+click for panning
       setIsPanning(true);
       setLastMousePos({ x: e.clientX, y: e.clientY });
-    } else if (editMode === 'draw') {
+    } else if (editMode === 'draw' || editMode === 'draw_room' || editMode === 'draw_wall') {
       const rect = canvasRef.current!.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;

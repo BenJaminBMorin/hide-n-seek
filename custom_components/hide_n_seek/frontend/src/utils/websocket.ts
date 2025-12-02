@@ -337,6 +337,73 @@ export class HideNSeekWebSocket {
     });
   }
 
+  async createWall(wallData: {
+    start: [number, number];
+    end: [number, number];
+    thickness: number;
+    color?: string;
+    type?: string;
+  }): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/update_wall',
+        config_entry_id: this.configEntryId,
+        wall_data: wallData,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to create wall'));
+        } else {
+          resolve(response.result);
+        }
+      });
+    });
+  }
+
+  async updateWall(wallId: string, wallData: {
+    start?: [number, number];
+    end?: [number, number];
+    thickness?: number;
+    color?: string;
+    type?: string;
+  }): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/update_wall',
+        config_entry_id: this.configEntryId,
+        wall_id: wallId,
+        wall_data: wallData,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to update wall'));
+        } else {
+          resolve(response.result);
+        }
+      });
+    });
+  }
+
+  async deleteWall(wallId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/delete_wall',
+        config_entry_id: this.configEntryId,
+        wall_id: wallId,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to delete wall'));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
   async getPersons(): Promise<Person[]> {
     return new Promise((resolve, reject) => {
       const id = this.send({

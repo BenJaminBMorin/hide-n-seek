@@ -30,6 +30,7 @@ import {
   PositionUpdateEvent,
   ZoneEvent,
   FloorPlan,
+  Wall,
   Person,
   PositionRecord,
 } from './types';
@@ -76,7 +77,7 @@ export const App: React.FC = () => {
   });
 
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
-  const [editMode, setEditMode] = useState<'view' | 'draw' | 'edit' | 'draw_room'>('view');
+  const [editMode, setEditMode] = useState<'view' | 'draw' | 'edit' | 'draw_room' | 'draw_wall' | 'edit_wall'>('view');
   const [drawingPoints, setDrawingPoints] = useState<Point[]>([]);
 
   const [snackbar, setSnackbar] = useState<{
@@ -201,7 +202,7 @@ export const App: React.FC = () => {
   };
 
   const handleCanvasClick = (point: Point) => {
-    if (editMode === 'draw' || editMode === 'draw_room') {
+    if (editMode === 'draw' || editMode === 'draw_room' || editMode === 'draw_wall') {
       setDrawingPoints([...drawingPoints, point]);
     }
   };
@@ -346,6 +347,71 @@ export const App: React.FC = () => {
       rooms: floorPlan.rooms.filter((r) => r.id !== roomId),
     });
     showSnackbar('Room deleted successfully');
+  };
+
+  const handleCreateWall = async (
+    start: Point,
+    end: Point,
+    thickness: number,
+    color: string,
+    type: string
+  ) => {
+    if (!ws) return;
+
+    try {
+      const wall = await ws.createWall({
+        start: [start.x, start.y],
+        end: [end.x, end.y],
+        thickness,
+        color,
+        type,
+      });
+
+      setFloorPlan({
+        ...floorPlan,
+        walls: [...floorPlan.walls, wall],
+      });
+      showSnackbar('Wall created successfully');
+    } catch (err: any) {
+      showSnackbar(`Failed to create wall: ${err.message}`, 'error');
+    }
+  };
+
+  const handleUpdateWall = async (wallId: string, wallData: Partial<Wall>) => {
+    if (!ws) return;
+
+    try {
+      const updatedWall = await ws.updateWall(wallId, {
+        start: wallData.start,
+        end: wallData.end,
+        thickness: wallData.thickness,
+        color: wallData.color,
+        type: wallData.type,
+      });
+
+      setFloorPlan({
+        ...floorPlan,
+        walls: floorPlan.walls.map((w) => (w.id === wallId ? updatedWall : w)),
+      });
+      showSnackbar('Wall updated successfully');
+    } catch (err: any) {
+      showSnackbar(`Failed to update wall: ${err.message}`, 'error');
+    }
+  };
+
+  const handleDeleteWall = async (wallId: string) => {
+    if (!ws) return;
+
+    try {
+      await ws.deleteWall(wallId);
+      setFloorPlan({
+        ...floorPlan,
+        walls: floorPlan.walls.filter((w) => w.id !== wallId),
+      });
+      showSnackbar('Wall deleted successfully');
+    } catch (err: any) {
+      showSnackbar(`Failed to delete wall: ${err.message}`, 'error');
+    }
   };
 
   const handleCreatePerson = async (
@@ -561,6 +627,9 @@ export const App: React.FC = () => {
                   onCreateRoom={handleCreateRoom}
                   onUpdateRoom={handleUpdateRoom}
                   onDeleteRoom={handleDeleteRoom}
+                  onCreateWall={handleCreateWall}
+                  onUpdateWall={handleUpdateWall}
+                  onDeleteWall={handleDeleteWall}
                   onEditModeChange={setEditMode}
                   editMode={editMode}
                   drawingPoints={drawingPoints}

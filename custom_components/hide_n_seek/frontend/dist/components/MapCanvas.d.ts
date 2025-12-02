@@ -8,7 +8,7 @@ interface MapCanvasProps {
     selectedZone: Zone | null;
     onZoneClick: (zone: Zone) => void;
     onCanvasClick: (point: Point) => void;
-    editMode: 'view' | 'draw' | 'edit' | 'draw_room';
+    editMode: 'view' | 'draw' | 'edit' | 'draw_room' | 'draw_wall' | 'edit_wall';
     drawingPoints: Point[];
     floorPlan?: FloorPlan;
     showFloorPlan?: boolean;

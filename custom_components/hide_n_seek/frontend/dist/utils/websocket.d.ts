@@ -34,6 +34,21 @@ export declare class HideNSeekWebSocket {
         color?: string;
     }): Promise<Room>;
     deleteRoom(roomId: string): Promise<void>;
+    createWall(wallData: {
+        start: [number, number];
+        end: [number, number];
+        thickness: number;
+        color?: string;
+        type?: string;
+    }): Promise<any>;
+    updateWall(wallId: string, wallData: {
+        start?: [number, number];
+        end?: [number, number];
+        thickness?: number;
+        color?: string;
+        type?: string;
+    }): Promise<any>;
+    deleteWall(wallId: string): Promise<void>;
     getPersons(): Promise<Person[]>;
     createPerson(personData: {
         name: string;

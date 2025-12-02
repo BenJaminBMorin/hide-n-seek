@@ -87,6 +87,8 @@ def async_register_websocket_handlers(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, handle_update_floor_plan)
     websocket_api.async_register_command(hass, handle_update_room)
     websocket_api.async_register_command(hass, handle_delete_room)
+    websocket_api.async_register_command(hass, handle_update_wall)
+    websocket_api.async_register_command(hass, handle_delete_wall)
 
 
 def _get_coordinator(hass: HomeAssistant, config_entry_id: str) -> HideNSeekCoordinator:
@@ -1034,4 +1036,100 @@ async def handle_delete_room(
         connection.send_error(msg["id"], "not_found", str(err))
     except Exception as err:
         _LOGGER.exception("Error deleting room: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hide_n_seek/update_wall",
+        vol.Required("config_entry_id"): str,
+        vol.Optional("wall_id"): str,
+        vol.Required("wall_data"): {
+            vol.Required("start"): [float, float],
+            vol.Required("end"): [float, float],
+            vol.Required("thickness"): float,
+            vol.Optional("color"): str,
+            vol.Optional("type"): str,
+        },
+    }
+)
+@websocket_api.async_response
+async def handle_update_wall(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Update or create a wall."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        wall_id = msg.get("wall_id")
+        wall_data = msg["wall_data"]
+
+        if wall_id:
+            # Update existing wall
+            wall = coordinator.floor_plan_manager.update_wall(
+                wall_id=wall_id,
+                start=wall_data.get("start"),
+                end=wall_data.get("end"),
+                thickness=wall_data.get("thickness"),
+                color=wall_data.get("color"),
+                wall_type=wall_data.get("type"),
+            )
+            if not wall:
+                connection.send_error(msg["id"], "not_found", "Wall not found")
+                return
+        else:
+            # Create new wall
+            import uuid
+            wall_id = f"wall_{uuid.uuid4().hex[:8]}"
+            wall = coordinator.floor_plan_manager.add_wall(
+                wall_id=wall_id,
+                start=wall_data["start"],
+                end=wall_data["end"],
+                thickness=wall_data["thickness"],
+                color=wall_data.get("color", "#333333"),
+                wall_type=wall_data.get("type", "standard"),
+            )
+
+        await coordinator.floor_plan_manager.async_save()
+
+        connection.send_result(msg["id"], wall.to_dict())
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_data", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error updating wall: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hide_n_seek/delete_wall",
+        vol.Required("config_entry_id"): str,
+        vol.Required("wall_id"): str,
+    }
+)
+@websocket_api.async_response
+async def handle_delete_wall(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Delete a wall."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        success = coordinator.floor_plan_manager.delete_wall(msg["wall_id"])
+
+        if success:
+            await coordinator.floor_plan_manager.async_save()
+            connection.send_result(msg["id"], {"success": True})
+        else:
+            connection.send_error(msg["id"], "not_found", "Wall not found")
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error deleting wall: %s", err)
         connection.send_error(msg["id"], "unknown_error", str(err))
