@@ -26,10 +26,29 @@ import {
   ZoneEvent,
 } from './types';
 
-// These values would normally come from Home Assistant context
-const CONFIG_ENTRY_ID = 'hide_n_seek_default';
-const WS_URL = 'ws://localhost:8123/api/websocket';
-const AUTH_TOKEN = 'your_long_lived_access_token';
+// Get Home Assistant connection from global context
+declare global {
+  interface Window {
+    hassConnection: any;
+    __hideNSeekConfigEntryId?: string;
+  }
+}
+
+// Use Home Assistant's existing WebSocket connection
+// This is provided by Home Assistant's frontend framework
+const getHassConnection = () => {
+  // For now, we'll use a simpler approach - connect directly
+  // In a production panel, you'd use Home Assistant's connection API
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const WS_URL = `${protocol}//${window.location.host}/api/websocket`;
+  return WS_URL;
+};
+
+const CONFIG_ENTRY_ID = window.__hideNSeekConfigEntryId || 'hide_n_seek_default';
+const WS_URL = getHassConnection();
+const AUTH_TOKEN = localStorage.getItem('hassTokens') ?
+  JSON.parse(localStorage.getItem('hassTokens')!).access_token :
+  '';
 
 export const App: React.FC = () => {
   const [ws, setWs] = useState<HideNSeekWebSocket | null>(null);
