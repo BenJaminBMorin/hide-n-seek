@@ -4,7 +4,5 @@
   "render_readme": true,
   "domains": ["hide_n_seek"],
   "homeassistant": "2024.1.0",
-  "iot_class": "local_push",
-  "zip_release": true,
-  "filename": "hide-n-seek.zip"
+  "iot_class": "local_push"
 }
