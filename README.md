@@ -15,18 +15,34 @@ A powerful Home Assistant custom integration that provides real-time indoor devi
 
 ### HACS (Recommended)
 
+#### Option 1: Add via HACS (After Repository Submission)
 1. Open HACS in Home Assistant
 2. Click "Integrations"
-3. Click the "+" button
-4. Search for "Hide-n-Seek"
-5. Click "Install"
-6. Restart Home Assistant
+3. Search for "Hide-n-Seek"
+4. Click "Download"
+5. Restart Home Assistant
+
+#### Option 2: Add as Custom Repository (Available Now)
+1. Open HACS in Home Assistant
+2. Click on "Integrations"
+3. Click the three dots in the top right corner
+4. Select "Custom repositories"
+5. Add `https://github.com/BenJaminBMorin/hide-n-seek` as the repository
+6. Select "Integration" as the category
+7. Click "Add"
+8. Find "Hide-n-Seek Presence Tracker" in the list and click "Download"
+9. Restart Home Assistant
+10. Go to Settings → Devices & Services → Add Integration → Search for "Hide-n-Seek"
 
 ### Manual Installation
 
-1. Copy the `custom_components/hide_n_seek` directory to your Home Assistant's `custom_components` directory
-2. Restart Home Assistant
-3. Add the integration via Settings → Devices & Services → Add Integration → Hide-n-Seek
+1. Download the latest release from [GitHub Releases](https://github.com/BenJaminBMorin/hide-n-seek/releases)
+2. Extract the `hide_n_seek` folder from the zip
+3. Copy the `hide_n_seek` folder to your Home Assistant's `config/custom_components/` directory
+4. Restart Home Assistant
+5. Go to Settings → Devices & Services → Add Integration → Search for "Hide-n-Seek"
+
+**Note**: The frontend is pre-built and included. No additional build steps required!
 
 ## Configuration
 

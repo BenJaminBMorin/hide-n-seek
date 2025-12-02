@@ -1,0 +1,1 @@
+{"version":3,"file":"SensorStatus.d.ts","sourceRoot":"","sources":["../../src/components/SensorStatus.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,OAAO,CAAC;AAgB1B,OAAO,EAAE,MAAM,EAAE,MAAM,UAAU,CAAC;AAElC,UAAU,iBAAiB;IACzB,OAAO,EAAE,MAAM,EAAE,CAAC;CACnB;AAED,eAAO,MAAM,YAAY,EAAE,KAAK,CAAC,EAAE,CAAC,iBAAiB,CA+HpD,CAAC"}

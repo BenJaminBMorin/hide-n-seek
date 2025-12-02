@@ -43,7 +43,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build outputs
-custom_components/hide_n_seek/frontend/dist/
+# Note: dist/ is committed for HACS users who don't build themselves
 custom_components/hide_n_seek/frontend/build/
 
 # Testing

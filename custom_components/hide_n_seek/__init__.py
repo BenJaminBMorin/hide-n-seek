@@ -59,6 +59,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .websocket_api import async_register_websocket_handlers
     async_register_websocket_handlers(hass)
 
+    # Register frontend panel
+    from .panel import async_register_panel
+    await async_register_panel(hass)
+
     # Register services
     await async_setup_services(hass, coordinator)
 
@@ -75,6 +79,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         coordinator = hass.data[DOMAIN].pop(entry.entry_id)
         await coordinator.async_shutdown()
+
+        # Unregister panel
+        from .panel import async_unregister_panel
+        await async_unregister_panel(hass)
 
     return unload_ok
 
