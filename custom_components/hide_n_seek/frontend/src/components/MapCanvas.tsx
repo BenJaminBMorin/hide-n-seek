@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sensor, TrackedDevice, Zone, Position, Point } from '../types';
+import { Sensor, TrackedDevice, Zone, Position, Point, FloorPlan } from '../types';
 
 interface MapCanvasProps {
   sensors: Sensor[];
@@ -11,6 +11,8 @@ interface MapCanvasProps {
   onCanvasClick: (point: Point) => void;
   editMode: 'view' | 'draw' | 'edit';
   drawingPoints: Point[];
+  floorPlan?: FloorPlan;
+  showFloorPlan?: boolean;
 }
 
 export const MapCanvas: React.FC<MapCanvasProps> = ({
@@ -23,6 +25,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   onCanvasClick,
   editMode,
   drawingPoints,
+  floorPlan,
+  showFloorPlan = true,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [scale, setScale] = useState(50); // pixels per meter
@@ -207,6 +211,58 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     }
   };
 
+  const drawFloorPlan = (ctx: CanvasRenderingContext2D) => {
+    if (!floorPlan || !showFloorPlan) return;
+
+    // Draw rooms
+    floorPlan.rooms.forEach((room) => {
+      if (room.coordinates.length < 3) return;
+
+      const screenCoords = room.coordinates.map((coord) =>
+        worldToScreen(coord[0], coord[1])
+      );
+
+      // Fill room
+      ctx.fillStyle = room.color;
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath();
+      ctx.moveTo(screenCoords[0].x, screenCoords[0].y);
+      for (let i = 1; i < screenCoords.length; i++) {
+        ctx.lineTo(screenCoords[i].x, screenCoords[i].y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+
+      // Draw room border
+      ctx.strokeStyle = room.color;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Draw room label
+      const centerX = screenCoords.reduce((sum, p) => sum + p.x, 0) / screenCoords.length;
+      const centerY = screenCoords.reduce((sum, p) => sum + p.y, 0) / screenCoords.length;
+
+      ctx.fillStyle = '#666';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(room.name, centerX, centerY);
+    });
+
+    // Draw walls
+    floorPlan.walls.forEach((wall) => {
+      const start = worldToScreen(wall.start[0], wall.start[1]);
+      const end = worldToScreen(wall.end[0], wall.end[1]);
+
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = wall.thickness * scale;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.stroke();
+    });
+  };
+
   const render = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -218,6 +274,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
+
+    // Draw floor plan (bottom layer)
+    drawFloorPlan(ctx);
 
     // Draw grid
     drawGrid(ctx, width, height);
@@ -244,7 +303,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
   useEffect(() => {
     render();
-  }, [sensors, devices, zones, positions, scale, offset, selectedZone, editMode, drawingPoints]);
+  }, [sensors, devices, zones, positions, scale, offset, selectedZone, editMode, drawingPoints, floorPlan, showFloorPlan]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {

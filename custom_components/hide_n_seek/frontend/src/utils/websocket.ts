@@ -1,4 +1,4 @@
-import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor } from '../types';
+import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor, FloorPlan, Room } from '../types';
 
 export class HideNSeekWebSocket {
   private ws: WebSocket | null = null;
@@ -242,6 +242,96 @@ export class HideNSeekWebSocket {
           reject(new Error(response.error?.message || 'Failed to get sensors'));
         } else {
           resolve(response.result.sensors);
+        }
+      });
+    });
+  }
+
+  async getFloorPlan(): Promise<FloorPlan> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/get_floor_plan',
+        config_entry_id: this.configEntryId,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to get floor plan'));
+        } else {
+          resolve(response.result);
+        }
+      });
+    });
+  }
+
+  async updateFloorPlanDimensions(width: number, height: number): Promise<FloorPlan> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/update_floor_plan',
+        config_entry_id: this.configEntryId,
+        dimensions: { width, height },
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to update floor plan'));
+        } else {
+          resolve(response.result);
+        }
+      });
+    });
+  }
+
+  async createRoom(roomData: { name: string; coordinates: number[][]; color?: string }): Promise<Room> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/update_room',
+        config_entry_id: this.configEntryId,
+        room_data: roomData,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to create room'));
+        } else {
+          resolve(response.result);
+        }
+      });
+    });
+  }
+
+  async updateRoom(roomId: string, roomData: { name?: string; coordinates?: number[][]; color?: string }): Promise<Room> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/update_room',
+        config_entry_id: this.configEntryId,
+        room_id: roomId,
+        room_data: roomData,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to update room'));
+        } else {
+          resolve(response.result);
+        }
+      });
+    });
+  }
+
+  async deleteRoom(roomId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/delete_room',
+        config_entry_id: this.configEntryId,
+        room_id: roomId,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to delete room'));
+        } else {
+          resolve();
         }
       });
     });
