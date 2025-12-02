@@ -1,0 +1,118 @@
+name: Auto Version & Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'custom_components/**'
+      - '!custom_components/**/manifest.json'
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  version-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(jq -r '.version' custom_components/hide_n_seek/manifest.json)
+          echo "Current version: $CURRENT_VERSION"
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Calculate new version
+        id: new_version
+        run: |
+          CURRENT="${{ steps.current_version.outputs.version }}"
+          BUMP_TYPE="${{ github.event.inputs.bump_type || 'patch' }}"
+
+          IFS='.' read -r major minor patch <<< "$CURRENT"
+
+          case $BUMP_TYPE in
+            major)
+              NEW_VERSION="$((major + 1)).0.0"
+              ;;
+            minor)
+              NEW_VERSION="${major}.$((minor + 1)).0"
+              ;;
+            patch)
+              NEW_VERSION="${major}.${minor}.$((patch + 1))"
+              ;;
+          esac
+
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update manifest.json
+        run: |
+          jq --arg version "${{ steps.new_version.outputs.version }}" '.version = $version' \
+            custom_components/hide_n_seek/manifest.json > tmp.json
+          mv tmp.json custom_components/hide_n_seek/manifest.json
+
+          echo "Updated manifest.json to version ${{ steps.new_version.outputs.version }}"
+          cat custom_components/hide_n_seek/manifest.json
+
+      - name: Commit version bump
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add custom_components/hide_n_seek/manifest.json
+          git commit -m "chore: Bump version to ${{ steps.new_version.outputs.version }}"
+
+      - name: Create and push tag
+        run: |
+          git tag "v${{ steps.new_version.outputs.version }}"
+          git push origin main
+          git push origin "v${{ steps.new_version.outputs.version }}"
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          NEW_TAG="v${{ steps.new_version.outputs.version }}"
+
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" HEAD^)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD^)
+          fi
+
+          {
+            echo "## What's Changed"
+            echo ""
+            echo "$COMMITS"
+            echo ""
+            if [ -n "$PREV_TAG" ]; then
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${NEW_TAG}"
+            fi
+          } > release_notes.md
+
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.new_version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
