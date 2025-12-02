@@ -26,6 +26,7 @@ from .triangulation import TriangulationEngine
 from .zone_manager import ZoneManager
 from .history_manager import PositionHistoryManager
 from .person_manager import PersonManager
+from .floor_plan_manager import FloorPlanManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ class HideNSeekCoordinator(DataUpdateCoordinator):
         data_path.mkdir(exist_ok=True)
         self.history_manager = PositionHistoryManager(hass, data_path)
         self.person_manager = PersonManager(hass)
+        self.floor_plan_manager = FloorPlanManager(hass)
 
         self._update_interval = update_interval
         self._unsub_timer = None
@@ -146,6 +148,9 @@ class HideNSeekCoordinator(DataUpdateCoordinator):
 
         # Initialize person manager
         await self.person_manager.async_initialize()
+
+        # Initialize floor plan manager
+        await self.floor_plan_manager.async_initialize()
 
         # Schedule daily cleanup at 3 AM
         self._unsub_cleanup = async_track_time_change(

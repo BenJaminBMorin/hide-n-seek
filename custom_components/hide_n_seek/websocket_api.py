@@ -33,6 +33,10 @@ from .const import (
     WS_TYPE_GET_POSITION_HISTORY,
     WS_TYPE_GET_HEAT_MAP_DATA,
     WS_TYPE_GET_TIMELINE_POSITIONS,
+    WS_TYPE_GET_FLOOR_PLAN,
+    WS_TYPE_UPDATE_FLOOR_PLAN,
+    WS_TYPE_UPDATE_ROOM,
+    WS_TYPE_DELETE_ROOM,
     EVENT_DEVICE_POSITION_UPDATE,
     EVENT_ZONE_ENTERED,
     EVENT_ZONE_EXITED,
@@ -77,6 +81,12 @@ def async_register_websocket_handlers(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, handle_get_position_history)
     websocket_api.async_register_command(hass, handle_get_heat_map_data)
     websocket_api.async_register_command(hass, handle_get_timeline_positions)
+
+    # Floor plan management
+    websocket_api.async_register_command(hass, handle_get_floor_plan)
+    websocket_api.async_register_command(hass, handle_update_floor_plan)
+    websocket_api.async_register_command(hass, handle_update_room)
+    websocket_api.async_register_command(hass, handle_delete_room)
 
 
 def _get_coordinator(hass: HomeAssistant, config_entry_id: str) -> HideNSeekCoordinator:
@@ -870,4 +880,158 @@ async def handle_get_timeline_positions(
         connection.send_error(msg["id"], "invalid_data", str(err))
     except Exception as err:
         _LOGGER.exception("Error getting timeline positions: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_GET_FLOOR_PLAN,
+        vol.Required("config_entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def handle_get_floor_plan(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Get the complete floor plan."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        floor_plan = coordinator.floor_plan_manager.get_floor_plan()
+
+        connection.send_result(msg["id"], floor_plan.to_dict())
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error getting floor plan: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_UPDATE_FLOOR_PLAN,
+        vol.Required("config_entry_id"): str,
+        vol.Optional("dimensions"): {
+            vol.Required("width"): float,
+            vol.Required("height"): float,
+        },
+    }
+)
+@websocket_api.async_response
+async def handle_update_floor_plan(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Update floor plan dimensions."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        dimensions = msg.get("dimensions")
+        if dimensions:
+            coordinator.floor_plan_manager.set_dimensions(
+                dimensions["width"], dimensions["height"]
+            )
+
+        await coordinator.floor_plan_manager.async_save()
+
+        floor_plan = coordinator.floor_plan_manager.get_floor_plan()
+        connection.send_result(msg["id"], floor_plan.to_dict())
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_data", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error updating floor plan: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_UPDATE_ROOM,
+        vol.Required("config_entry_id"): str,
+        vol.Optional("room_id"): str,
+        vol.Required("room_data"): {
+            vol.Required("name"): str,
+            vol.Required("coordinates"): [[float]],
+            vol.Optional("color"): str,
+        },
+    }
+)
+@websocket_api.async_response
+async def handle_update_room(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Update or create a room."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        room_id = msg.get("room_id")
+        room_data = msg["room_data"]
+
+        if room_id:
+            # Update existing room
+            room = coordinator.floor_plan_manager.update_room(
+                room_id=room_id,
+                name=room_data.get("name"),
+                coordinates=room_data.get("coordinates"),
+                color=room_data.get("color"),
+            )
+            if not room:
+                connection.send_error(msg["id"], "not_found", "Room not found")
+                return
+        else:
+            # Create new room
+            room_id = f"room_{room_data['name'].lower().replace(' ', '_')}"
+            room = coordinator.floor_plan_manager.add_room(
+                room_id=room_id,
+                name=room_data["name"],
+                coordinates=room_data["coordinates"],
+                color=room_data.get("color", "#E0E0E0"),
+            )
+
+        await coordinator.floor_plan_manager.async_save()
+
+        connection.send_result(msg["id"], room.to_dict())
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_data", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error updating room: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_DELETE_ROOM,
+        vol.Required("config_entry_id"): str,
+        vol.Required("room_id"): str,
+    }
+)
+@websocket_api.async_response
+async def handle_delete_room(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Delete a room."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        success = coordinator.floor_plan_manager.delete_room(msg["room_id"])
+
+        if success:
+            await coordinator.floor_plan_manager.async_save()
+            connection.send_result(msg["id"], {"success": True})
+        else:
+            connection.send_error(msg["id"], "not_found", "Room not found")
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error deleting room: %s", err)
         connection.send_error(msg["id"], "unknown_error", str(err))
