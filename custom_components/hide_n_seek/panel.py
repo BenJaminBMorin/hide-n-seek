@@ -31,13 +31,10 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         return
 
     # Register the frontend module
-    await hass.http.async_register_static_paths(
-        [
-            {
-                "path": PANEL_URL,
-                "directory": str(panel_dir),
-            }
-        ]
+    hass.http.register_static_path(
+        PANEL_URL,
+        str(panel_dir),
+        cache_headers=True,
     )
 
     # Register the panel
