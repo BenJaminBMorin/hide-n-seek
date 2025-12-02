@@ -19,21 +19,33 @@ const theme = createTheme({
 // Define custom element for Home Assistant panel
 class HideNSeekPanel extends HTMLElement {
   private root?: Root;
+  private _hass?: any;
+
+  set hass(value: any) {
+    this._hass = value;
+    this.render();
+  }
 
   connectedCallback() {
-    // Create shadow root for style isolation (optional)
+    // Create container
     const container = document.createElement('div');
     container.style.height = '100%';
     container.style.width = '100%';
     this.appendChild(container);
 
-    // Mount React app
+    // Create root
     this.root = createRoot(container);
+    this.render();
+  }
+
+  render() {
+    if (!this.root) return;
+
     this.root.render(
       <React.StrictMode>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <App />
+          <App hass={this._hass} />
         </ThemeProvider>
       </React.StrictMode>
     );

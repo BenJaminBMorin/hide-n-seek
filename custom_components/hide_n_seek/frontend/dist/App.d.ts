@@ -5,5 +5,9 @@ declare global {
         __hideNSeekConfigEntryId?: string;
     }
 }
-export declare const App: React.FC;
+interface AppProps {
+    hass?: any;
+}
+export declare const App: React.FC<AppProps>;
+export {};
 //# sourceMappingURL=App.d.ts.map

@@ -43,23 +43,11 @@ declare global {
   }
 }
 
-// Use Home Assistant's existing WebSocket connection
-// This is provided by Home Assistant's frontend framework
-const getHassConnection = () => {
-  // For now, we'll use a simpler approach - connect directly
-  // In a production panel, you'd use Home Assistant's connection API
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const WS_URL = `${protocol}//${window.location.host}/api/websocket`;
-  return WS_URL;
-};
+interface AppProps {
+  hass?: any;
+}
 
-const CONFIG_ENTRY_ID = window.__hideNSeekConfigEntryId || 'hide_n_seek_default';
-const WS_URL = getHassConnection();
-const AUTH_TOKEN = localStorage.getItem('hassTokens') ?
-  JSON.parse(localStorage.getItem('hassTokens')!).access_token :
-  '';
-
-export const App: React.FC = () => {
+export const App: React.FC<AppProps> = ({ hass }) => {
   const [ws, setWs] = useState<HideNSeekWebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -95,6 +83,19 @@ export const App: React.FC = () => {
   const [historicalPositions, setHistoricalPositions] = useState<Record<string, PositionRecord[]>>({});
 
   useEffect(() => {
+    // Wait for hass object to be available
+    if (!hass || !hass.auth || !hass.auth.data || !hass.auth.data.access_token) {
+      setLoading(false);
+      setError('Waiting for Home Assistant connection...');
+      return;
+    }
+
+    // Get WebSocket URL and auth token from hass
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const WS_URL = `${protocol}//${window.location.host}/api/websocket`;
+    const AUTH_TOKEN = hass.auth.data.access_token;
+    const CONFIG_ENTRY_ID = window.__hideNSeekConfigEntryId || 'hide_n_seek_default';
+
     const websocket = new HideNSeekWebSocket(CONFIG_ENTRY_ID);
 
     websocket
@@ -102,6 +103,7 @@ export const App: React.FC = () => {
       .then(() => {
         setConnected(true);
         setWs(websocket);
+        setError(null);
         return Promise.all([
           websocket.getMapData(),
           websocket.getFloorPlan(),
@@ -125,7 +127,7 @@ export const App: React.FC = () => {
     return () => {
       websocket.disconnect();
     };
-  }, []);
+  }, [hass]);
 
   useEffect(() => {
     if (!ws || !connected) return;
