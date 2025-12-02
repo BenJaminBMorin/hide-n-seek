@@ -15,6 +15,7 @@ import { MapCanvas } from './components/MapCanvas';
 import { ZoneEditor } from './components/ZoneEditor';
 import { DeviceList } from './components/DeviceList';
 import { SensorStatus } from './components/SensorStatus';
+import { SensorManager } from './components/SensorManager';
 import { HideNSeekWebSocket } from './utils/websocket';
 import {
   Sensor,
@@ -206,6 +207,30 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleAddSensor = async (sensorData: Omit<Sensor, 'last_seen'>) => {
+    if (!ws) return;
+
+    const sensor = await ws.addSensor(sensorData);
+    setSensors([...sensors, sensor]);
+    showSnackbar(`Sensor "${sensor.name}" added successfully`);
+  };
+
+  const handleUpdateSensor = async (sensorId: string, sensorData: Partial<Sensor>) => {
+    if (!ws) return;
+
+    const updatedSensor = await ws.updateSensor(sensorId, sensorData);
+    setSensors(sensors.map((s) => (s.id === sensorId ? updatedSensor : s)));
+    showSnackbar(`Sensor "${updatedSensor.name}" updated successfully`);
+  };
+
+  const handleDeleteSensor = async (sensorId: string) => {
+    if (!ws) return;
+
+    await ws.deleteSensor(sensorId);
+    setSensors(sensors.filter((s) => s.id !== sensorId));
+    showSnackbar('Sensor deleted successfully');
+  };
+
   if (loading) {
     return (
       <Box
@@ -310,7 +335,12 @@ export const App: React.FC = () => {
               </Grid>
 
               <Grid item xs={12}>
-                <SensorStatus sensors={sensors} />
+                <SensorManager
+                  sensors={sensors}
+                  onAddSensor={handleAddSensor}
+                  onUpdateSensor={handleUpdateSensor}
+                  onDeleteSensor={handleDeleteSensor}
+                />
               </Grid>
             </Grid>
           </Grid>

@@ -58,3 +58,58 @@ export interface Point {
   x: number;
   y: number;
 }
+
+// Person tracking types
+export interface Person {
+  id: string;
+  name: string;
+  default_device_id: string;
+  linked_device_ids: string[];
+  color: string;
+  avatar?: string;
+}
+
+// Position history types
+export interface PositionRecord {
+  device_id: string;
+  timestamp: number;
+  x: number;
+  y: number;
+  confidence: number;
+  method: string;
+}
+
+export interface HeatMapData {
+  grid_size: number;
+  bounds: {
+    min_x: number;
+    max_x: number;
+    min_y: number;
+    max_y: number;
+  };
+  data: Record<string, number>; // "x,y" -> frequency
+}
+
+// Floor plan types
+export interface Room {
+  id: string;
+  name: string;
+  coordinates: Array<[number, number]>; // Polygon coordinates
+  color: string;
+}
+
+export interface Wall {
+  id: string;
+  start: [number, number];
+  end: [number, number];
+  thickness: number;
+}
+
+export interface FloorPlan {
+  rooms: Room[];
+  walls: Wall[];
+  dimensions: {
+    width: number;
+    height: number;
+  };
+}

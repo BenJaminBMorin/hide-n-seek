@@ -4,12 +4,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import timedelta
+from pathlib import Path
 from typing import Any, Dict
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_track_time_interval, async_track_time_change
 
 from .const import (
     DOMAIN,
@@ -18,10 +19,13 @@ from .const import (
     ATTR_POSITION,
     ATTR_CONFIDENCE,
     ATTR_SENSOR_COUNT,
+    DEFAULT_RETENTION_DAYS,
 )
 from .device_manager import DeviceManager
 from .triangulation import TriangulationEngine
 from .zone_manager import ZoneManager
+from .history_manager import PositionHistoryManager
+from .person_manager import PersonManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,8 +52,15 @@ class HideNSeekCoordinator(DataUpdateCoordinator):
         self.triangulation_engine = TriangulationEngine()
         self.zone_manager = ZoneManager(hass)
 
+        # Initialize history and person managers
+        data_path = Path(hass.config.path(DOMAIN))
+        data_path.mkdir(exist_ok=True)
+        self.history_manager = PositionHistoryManager(hass, data_path)
+        self.person_manager = PersonManager(hass)
+
         self._update_interval = update_interval
         self._unsub_timer = None
+        self._unsub_cleanup = None
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from sensors and calculate positions."""
@@ -103,6 +114,9 @@ class HideNSeekCoordinator(DataUpdateCoordinator):
                     },
                 )
 
+                # Record position to history
+                await self.history_manager.record_position(device.id, position)
+
             return {
                 "positions": positions,
                 "sensors": {
@@ -127,8 +141,36 @@ class HideNSeekCoordinator(DataUpdateCoordinator):
         # Load zones from storage
         await self.zone_manager.async_load()
 
+        # Initialize history manager
+        await self.history_manager.async_initialize()
+
+        # Initialize person manager
+        await self.person_manager.async_initialize()
+
+        # Schedule daily cleanup at 3 AM
+        self._unsub_cleanup = async_track_time_change(
+            self.hass,
+            self._async_cleanup_old_data,
+            hour=3,
+            minute=0,
+            second=0
+        )
+
         # Perform first data refresh
         await super().async_config_entry_first_refresh()
+
+    async def _async_cleanup_old_data(self, now=None) -> None:
+        """Clean up old position history data."""
+        try:
+            retention_days = self.entry.options.get("retention_days", DEFAULT_RETENTION_DAYS)
+            deleted_count = await self.history_manager.cleanup_old_data(retention_days)
+            _LOGGER.info("Cleaned up %d old position records", deleted_count)
+
+            # Pre-aggregate heat maps for the previous hour
+            await self.history_manager.pre_aggregate_heat_maps()
+
+        except Exception as err:
+            _LOGGER.error("Error during cleanup: %s", err)
 
     async def calibrate_sensor(self, sensor_id: str) -> None:
         """Calibrate a sensor (placeholder for future implementation)."""

@@ -1,4 +1,4 @@
-import { MapData, PositionUpdateEvent, ZoneEvent, Zone } from '../types';
+import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor } from '../types';
 export declare class HideNSeekWebSocket {
     private ws;
     private messageId;
@@ -17,6 +17,10 @@ export declare class HideNSeekWebSocket {
     subscribeToZones(callback: (event: ZoneEvent, eventType: string) => void): () => void;
     updateZone(zoneId: string | null, zoneData: Partial<Zone>): Promise<Zone>;
     deleteZone(zoneId: string): Promise<void>;
+    addSensor(sensorData: Omit<Sensor, 'last_seen'>): Promise<Sensor>;
+    updateSensor(sensorId: string, sensorData: Partial<Sensor>): Promise<Sensor>;
+    deleteSensor(sensorId: string): Promise<void>;
+    getSensors(): Promise<Sensor[]>;
     disconnect(): void;
 }
 //# sourceMappingURL=websocket.d.ts.map

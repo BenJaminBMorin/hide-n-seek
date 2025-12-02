@@ -147,6 +147,34 @@ class DeviceManager:
 
         return sensor
 
+    def update_sensor(
+        self,
+        sensor_id: str,
+        name: Optional[str] = None,
+        sensor_type: Optional[str] = None,
+        location: Optional[tuple[float, float]] = None,
+        enabled: Optional[bool] = None,
+        metadata: Optional[dict] = None,
+    ) -> Optional[Sensor]:
+        """Update an existing sensor."""
+        sensor = self.sensors.get(sensor_id)
+        if sensor is None:
+            return None
+
+        if name is not None:
+            sensor.name = name
+        if sensor_type is not None:
+            sensor.type = sensor_type
+        if location is not None:
+            sensor.location = location
+        if enabled is not None:
+            sensor.enabled = enabled
+        if metadata is not None:
+            sensor.metadata = metadata
+
+        _LOGGER.info("Updated sensor: %s", sensor.name)
+        return sensor
+
     def remove_sensor(self, sensor_id: str) -> bool:
         """Remove a sensor."""
         if sensor_id in self.sensors:

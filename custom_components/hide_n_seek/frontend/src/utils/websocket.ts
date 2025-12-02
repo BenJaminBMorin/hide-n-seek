@@ -1,4 +1,4 @@
-import { MapData, PositionUpdateEvent, ZoneEvent, Zone } from '../types';
+import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor } from '../types';
 
 export class HideNSeekWebSocket {
   private ws: WebSocket | null = null;
@@ -170,6 +170,78 @@ export class HideNSeekWebSocket {
           reject(new Error(response.error?.message || 'Failed to delete zone'));
         } else {
           resolve();
+        }
+      });
+    });
+  }
+
+  async addSensor(sensorData: Omit<Sensor, 'last_seen'>): Promise<Sensor> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/add_sensor',
+        config_entry_id: this.configEntryId,
+        sensor_data: sensorData,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to add sensor'));
+        } else {
+          resolve(response.result);
+        }
+      });
+    });
+  }
+
+  async updateSensor(sensorId: string, sensorData: Partial<Sensor>): Promise<Sensor> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/update_sensor',
+        config_entry_id: this.configEntryId,
+        sensor_id: sensorId,
+        sensor_data: sensorData,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to update sensor'));
+        } else {
+          resolve(response.result);
+        }
+      });
+    });
+  }
+
+  async deleteSensor(sensorId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/delete_sensor',
+        config_entry_id: this.configEntryId,
+        sensor_id: sensorId,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to delete sensor'));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  async getSensors(): Promise<Sensor[]> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/get_sensors',
+        config_entry_id: this.configEntryId,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to get sensors'));
+        } else {
+          resolve(response.result.sensors);
         }
       });
     });

@@ -18,6 +18,10 @@ from .const import (
     WS_TYPE_DELETE_ZONE,
     WS_TYPE_CALIBRATE_SENSOR,
     WS_TYPE_GET_MAP_DATA,
+    WS_TYPE_ADD_SENSOR,
+    WS_TYPE_UPDATE_SENSOR,
+    WS_TYPE_DELETE_SENSOR,
+    WS_TYPE_GET_SENSORS,
     EVENT_DEVICE_POSITION_UPDATE,
     EVENT_ZONE_ENTERED,
     EVENT_ZONE_EXITED,
@@ -37,6 +41,9 @@ def async_register_websocket_handlers(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, handle_delete_zone)
     websocket_api.async_register_command(hass, handle_calibrate_sensor)
     websocket_api.async_register_command(hass, handle_add_sensor)
+    websocket_api.async_register_command(hass, handle_update_sensor)
+    websocket_api.async_register_command(hass, handle_delete_sensor)
+    websocket_api.async_register_command(hass, handle_get_sensors)
     websocket_api.async_register_command(hass, handle_add_tracked_device)
 
 
@@ -252,7 +259,7 @@ async def handle_calibrate_sensor(
 
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "hide_n_seek/add_sensor",
+        vol.Required("type"): WS_TYPE_ADD_SENSOR,
         vol.Required("config_entry_id"): str,
         vol.Required("sensor_data"): {
             vol.Required("id"): str,
@@ -325,4 +332,108 @@ async def handle_add_tracked_device(
         connection.send_error(msg["id"], "invalid_data", str(err))
     except Exception as err:
         _LOGGER.exception("Error adding tracked device: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_UPDATE_SENSOR,
+        vol.Required("config_entry_id"): str,
+        vol.Required("sensor_id"): str,
+        vol.Optional("sensor_data"): {
+            vol.Optional("name"): str,
+            vol.Optional("type"): str,
+            vol.Optional("location"): [float, float],
+            vol.Optional("enabled"): bool,
+            vol.Optional("metadata"): dict,
+        },
+    }
+)
+@websocket_api.async_response
+async def handle_update_sensor(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Update an existing sensor."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        sensor_data = msg.get("sensor_data", {})
+        sensor = coordinator.device_manager.update_sensor(
+            sensor_id=msg["sensor_id"],
+            name=sensor_data.get("name"),
+            sensor_type=sensor_data.get("type"),
+            location=tuple(sensor_data["location"]) if "location" in sensor_data else None,
+            enabled=sensor_data.get("enabled"),
+            metadata=sensor_data.get("metadata"),
+        )
+
+        if sensor:
+            connection.send_result(msg["id"], sensor.to_dict())
+        else:
+            connection.send_error(msg["id"], "not_found", "Sensor not found")
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_data", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error updating sensor: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_DELETE_SENSOR,
+        vol.Required("config_entry_id"): str,
+        vol.Required("sensor_id"): str,
+    }
+)
+@websocket_api.async_response
+async def handle_delete_sensor(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Delete a sensor."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        success = coordinator.device_manager.remove_sensor(msg["sensor_id"])
+
+        if success:
+            connection.send_result(msg["id"], {"success": True})
+        else:
+            connection.send_error(msg["id"], "not_found", "Sensor not found")
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error deleting sensor: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_GET_SENSORS,
+        vol.Required("config_entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def handle_get_sensors(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Get all sensors."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        sensors = [s.to_dict() for s in coordinator.device_manager.get_all_sensors()]
+
+        connection.send_result(msg["id"], {"sensors": sensors})
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error getting sensors: %s", err)
         connection.send_error(msg["id"], "unknown_error", str(err))
