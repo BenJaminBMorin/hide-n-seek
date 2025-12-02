@@ -17,6 +17,8 @@ import { DeviceList } from './components/DeviceList';
 import { SensorStatus } from './components/SensorStatus';
 import { SensorManager } from './components/SensorManager';
 import { FloorPlanEditor } from './components/FloorPlanEditor';
+import { PersonManager } from './components/PersonManager';
+import { PersonSwitcher } from './components/PersonSwitcher';
 import { HideNSeekWebSocket } from './utils/websocket';
 import {
   Sensor,
@@ -27,6 +29,7 @@ import {
   PositionUpdateEvent,
   ZoneEvent,
   FloorPlan,
+  Person,
 } from './types';
 
 // Get Home Assistant connection from global context
@@ -63,6 +66,7 @@ export const App: React.FC = () => {
   const [devices, setDevices] = useState<TrackedDevice[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [positions, setPositions] = useState<Record<string, Position>>({});
+  const [persons, setPersons] = useState<Person[]>([]);
   const [floorPlan, setFloorPlan] = useState<FloorPlan>({
     rooms: [],
     walls: [],
@@ -90,14 +94,16 @@ export const App: React.FC = () => {
         return Promise.all([
           websocket.getMapData(),
           websocket.getFloorPlan(),
+          websocket.getPersons(),
         ]);
       })
-      .then(([mapData, floorPlanData]) => {
+      .then(([mapData, floorPlanData, personsData]) => {
         setSensors(mapData.sensors);
         setDevices(mapData.devices);
         setZones(mapData.zones);
         setPositions(mapData.positions);
         setFloorPlan(floorPlanData);
+        setPersons(personsData);
         setLoading(false);
       })
       .catch((err) => {
@@ -298,6 +304,75 @@ export const App: React.FC = () => {
     showSnackbar('Room deleted successfully');
   };
 
+  const handleCreatePerson = async (
+    name: string,
+    defaultDeviceId: string,
+    linkedDeviceIds: string[],
+    color: string
+  ) => {
+    if (!ws) return;
+
+    try {
+      const person = await ws.createPerson({
+        name,
+        default_device_id: defaultDeviceId,
+        linked_device_ids: linkedDeviceIds,
+        color,
+      });
+      setPersons([...persons, person]);
+      showSnackbar(`Person "${name}" created successfully`);
+    } catch (err: any) {
+      showSnackbar(`Failed to create person: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  const handleUpdatePerson = async (person: Person) => {
+    if (!ws) return;
+
+    try {
+      const updatedPerson = await ws.updatePerson(person.id, {
+        name: person.name,
+        default_device_id: person.default_device_id,
+        linked_device_ids: person.linked_device_ids,
+        color: person.color,
+      });
+      setPersons(persons.map((p) => (p.id === person.id ? updatedPerson : p)));
+      showSnackbar(`Person "${person.name}" updated successfully`);
+    } catch (err: any) {
+      showSnackbar(`Failed to update person: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  const handleDeletePerson = async (personId: string) => {
+    if (!ws) return;
+
+    try {
+      await ws.deletePerson(personId);
+      setPersons(persons.filter((p) => p.id !== personId));
+      showSnackbar('Person deleted successfully');
+    } catch (err: any) {
+      showSnackbar(`Failed to delete person: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  const handleSetActiveDevice = async (personId: string, deviceId: string) => {
+    if (!ws) return;
+
+    try {
+      const updatedPerson = await ws.updatePerson(personId, {
+        default_device_id: deviceId,
+      });
+      setPersons(persons.map((p) => (p.id === personId ? updatedPerson : p)));
+      showSnackbar('Active device updated');
+    } catch (err: any) {
+      showSnackbar(`Failed to set active device: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
   if (loading) {
     return (
       <Box
@@ -360,6 +435,13 @@ export const App: React.FC = () => {
       </AppBar>
 
       <Container maxWidth={false} sx={{ mt: 3, mb: 3 }}>
+        <PersonSwitcher
+          persons={persons}
+          devices={devices}
+          positions={positions}
+          onSetActiveDevice={handleSetActiveDevice}
+        />
+
         <Grid container spacing={3}>
           <Grid item xs={12} lg={8}>
             <Paper elevation={3} sx={{ p: 2 }}>
@@ -423,6 +505,16 @@ export const App: React.FC = () => {
                   editMode={editMode}
                   drawingPoints={drawingPoints}
                   onClearDrawing={handleClearDrawing}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <PersonManager
+                  persons={persons}
+                  devices={devices}
+                  onCreatePerson={handleCreatePerson}
+                  onUpdatePerson={handleUpdatePerson}
+                  onDeletePerson={handleDeletePerson}
                 />
               </Grid>
             </Grid>
