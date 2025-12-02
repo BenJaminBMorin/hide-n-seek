@@ -1,4 +1,4 @@
-import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor, FloorPlan, Room, Person } from '../types';
+import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor, FloorPlan, Room, Person, PositionRecord } from '../types';
 
 export class HideNSeekWebSocket {
   private ws: WebSocket | null = null;
@@ -419,6 +419,32 @@ export class HideNSeekWebSocket {
           reject(new Error(response.error?.message || 'Failed to delete person'));
         } else {
           resolve();
+        }
+      });
+    });
+  }
+
+  async getPositionHistory(
+    deviceId: string,
+    startTime: number,
+    endTime: number,
+    downsample?: number
+  ): Promise<PositionRecord[]> {
+    return new Promise((resolve, reject) => {
+      const id = this.send({
+        type: 'hide_n_seek/get_position_history',
+        config_entry_id: this.configEntryId,
+        device_id: deviceId,
+        start_time: startTime,
+        end_time: endTime,
+        downsample: downsample,
+      });
+
+      this.callbacks.set(id, (response) => {
+        if (response.success === false) {
+          reject(new Error(response.error?.message || 'Failed to get position history'));
+        } else {
+          resolve(response.result.positions);
         }
       });
     });

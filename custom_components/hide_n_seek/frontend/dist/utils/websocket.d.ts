@@ -1,4 +1,4 @@
-import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor, FloorPlan, Room, Person } from '../types';
+import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor, FloorPlan, Room, Person, PositionRecord } from '../types';
 export declare class HideNSeekWebSocket {
     private ws;
     private messageId;
@@ -50,6 +50,7 @@ export declare class HideNSeekWebSocket {
         avatar?: string;
     }): Promise<Person>;
     deletePerson(personId: string): Promise<void>;
+    getPositionHistory(deviceId: string, startTime: number, endTime: number, downsample?: number): Promise<PositionRecord[]>;
     disconnect(): void;
 }
 //# sourceMappingURL=websocket.d.ts.map
