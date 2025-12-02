@@ -1,0 +1,42 @@
+calibrate_sensor:
+  name: Calibrate Sensor
+  description: Calibrate a sensor for better accuracy.
+  fields:
+    sensor_id:
+      name: Sensor ID
+      description: The ID of the sensor to calibrate.
+      required: true
+      example: "sensor.ble_tracker_1"
+      selector:
+        text:
+
+create_zone:
+  name: Create Zone
+  description: Create a new tracking zone.
+  fields:
+    name:
+      name: Zone Name
+      description: Name of the zone.
+      required: true
+      example: "Living Room"
+      selector:
+        text:
+    coordinates:
+      name: Coordinates
+      description: List of [x, y] coordinates defining the zone polygon.
+      required: true
+      example: "[[0, 0], [10, 0], [10, 10], [0, 10]]"
+      selector:
+        object:
+
+delete_zone:
+  name: Delete Zone
+  description: Delete a tracking zone.
+  fields:
+    zone_id:
+      name: Zone ID
+      description: The ID of the zone to delete.
+      required: true
+      example: "zone_living_room"
+      selector:
+        text:
