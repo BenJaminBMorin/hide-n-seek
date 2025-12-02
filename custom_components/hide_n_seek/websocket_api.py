@@ -93,9 +93,27 @@ def async_register_websocket_handlers(hass: HomeAssistant) -> None:
 
 def _get_coordinator(hass: HomeAssistant, config_entry_id: str) -> HideNSeekCoordinator:
     """Get coordinator from entry ID."""
-    if config_entry_id not in hass.data.get(DOMAIN, {}):
-        raise ValueError(f"Unknown config entry: {config_entry_id}")
-    return hass.data[DOMAIN][config_entry_id]
+    domain_data = hass.data.get(DOMAIN, {})
+    available_ids = list(domain_data.keys())
+
+    _LOGGER.debug(f"Looking for config_entry_id: {config_entry_id}")
+    _LOGGER.debug(f"Available entry IDs: {available_ids}")
+
+    if config_entry_id not in domain_data:
+        if len(available_ids) == 1:
+            # If there's only one entry, use it
+            actual_id = available_ids[0]
+            _LOGGER.warning(
+                f"Config entry ID {config_entry_id} not found, but only one entry exists. "
+                f"Using {actual_id} instead."
+            )
+            return domain_data[actual_id]
+        else:
+            raise ValueError(
+                f"Unknown config entry: {config_entry_id}. "
+                f"Available: {available_ids}"
+            )
+    return domain_data[config_entry_id]
 
 
 @websocket_api.websocket_command(
