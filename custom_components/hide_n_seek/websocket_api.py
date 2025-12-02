@@ -22,6 +22,17 @@ from .const import (
     WS_TYPE_UPDATE_SENSOR,
     WS_TYPE_DELETE_SENSOR,
     WS_TYPE_GET_SENSORS,
+    WS_TYPE_ADD_TRACKED_DEVICE,
+    WS_TYPE_UPDATE_TRACKED_DEVICE,
+    WS_TYPE_DELETE_TRACKED_DEVICE,
+    WS_TYPE_GET_TRACKED_DEVICES,
+    WS_TYPE_GET_PERSONS,
+    WS_TYPE_UPDATE_PERSON,
+    WS_TYPE_DELETE_PERSON,
+    WS_TYPE_SET_ACTIVE_DEVICE,
+    WS_TYPE_GET_POSITION_HISTORY,
+    WS_TYPE_GET_HEAT_MAP_DATA,
+    WS_TYPE_GET_TIMELINE_POSITIONS,
     EVENT_DEVICE_POSITION_UPDATE,
     EVENT_ZONE_ENTERED,
     EVENT_ZONE_EXITED,
@@ -34,17 +45,38 @@ _LOGGER = logging.getLogger(__name__)
 @callback
 def async_register_websocket_handlers(hass: HomeAssistant) -> None:
     """Register WebSocket API handlers."""
+    # Position and zone subscriptions
     websocket_api.async_register_command(hass, handle_subscribe_positions)
     websocket_api.async_register_command(hass, handle_subscribe_zones)
     websocket_api.async_register_command(hass, handle_get_map_data)
+
+    # Zone management
     websocket_api.async_register_command(hass, handle_update_zone)
     websocket_api.async_register_command(hass, handle_delete_zone)
+
+    # Sensor management
     websocket_api.async_register_command(hass, handle_calibrate_sensor)
     websocket_api.async_register_command(hass, handle_add_sensor)
     websocket_api.async_register_command(hass, handle_update_sensor)
     websocket_api.async_register_command(hass, handle_delete_sensor)
     websocket_api.async_register_command(hass, handle_get_sensors)
+
+    # Device management
     websocket_api.async_register_command(hass, handle_add_tracked_device)
+    websocket_api.async_register_command(hass, handle_update_tracked_device)
+    websocket_api.async_register_command(hass, handle_delete_tracked_device)
+    websocket_api.async_register_command(hass, handle_get_tracked_devices)
+
+    # Person management
+    websocket_api.async_register_command(hass, handle_get_persons)
+    websocket_api.async_register_command(hass, handle_update_person)
+    websocket_api.async_register_command(hass, handle_delete_person)
+    websocket_api.async_register_command(hass, handle_set_active_device)
+
+    # History queries
+    websocket_api.async_register_command(hass, handle_get_position_history)
+    websocket_api.async_register_command(hass, handle_get_heat_map_data)
+    websocket_api.async_register_command(hass, handle_get_timeline_positions)
 
 
 def _get_coordinator(hass: HomeAssistant, config_entry_id: str) -> HideNSeekCoordinator:
@@ -436,4 +468,406 @@ async def handle_get_sensors(
         connection.send_error(msg["id"], "not_found", str(err))
     except Exception as err:
         _LOGGER.exception("Error getting sensors: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_UPDATE_TRACKED_DEVICE,
+        vol.Required("config_entry_id"): str,
+        vol.Required("device_id"): str,
+        vol.Optional("device_data"): {
+            vol.Optional("name"): str,
+            vol.Optional("mac_address"): str,
+        },
+    }
+)
+@websocket_api.async_response
+async def handle_update_tracked_device(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Update a tracked device."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        device = coordinator.device_manager.get_tracked_device(msg["device_id"])
+        if not device:
+            connection.send_error(msg["id"], "not_found", "Device not found")
+            return
+
+        device_data = msg.get("device_data", {})
+        if "name" in device_data:
+            device.name = device_data["name"]
+        if "mac_address" in device_data:
+            device.mac_address = device_data["mac_address"]
+
+        connection.send_result(msg["id"], device.to_dict())
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_data", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error updating tracked device: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_DELETE_TRACKED_DEVICE,
+        vol.Required("config_entry_id"): str,
+        vol.Required("device_id"): str,
+    }
+)
+@websocket_api.async_response
+async def handle_delete_tracked_device(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Delete a tracked device."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        success = coordinator.device_manager.remove_tracked_device(msg["device_id"])
+
+        if success:
+            connection.send_result(msg["id"], {"success": True})
+        else:
+            connection.send_error(msg["id"], "not_found", "Device not found")
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error deleting tracked device: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_GET_TRACKED_DEVICES,
+        vol.Required("config_entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def handle_get_tracked_devices(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Get all tracked devices."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        devices = [d.to_dict() for d in coordinator.device_manager.get_all_tracked_devices()]
+
+        connection.send_result(msg["id"], {"devices": devices})
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error getting tracked devices: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_GET_PERSONS,
+        vol.Required("config_entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def handle_get_persons(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Get all persons."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        persons = [p.to_dict() for p in coordinator.person_manager.get_all_persons()]
+
+        connection.send_result(msg["id"], {"persons": persons})
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error getting persons: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_UPDATE_PERSON,
+        vol.Required("config_entry_id"): str,
+        vol.Optional("person_id"): str,
+        vol.Required("person_data"): {
+            vol.Required("name"): str,
+            vol.Required("default_device_id"): str,
+            vol.Optional("linked_device_ids"): [str],
+            vol.Optional("color"): str,
+            vol.Optional("avatar"): str,
+        },
+    }
+)
+@websocket_api.async_response
+async def handle_update_person(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Update or create a person."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        person_id = msg.get("person_id")
+        person_data = msg["person_data"]
+
+        if person_id:
+            # Update existing person
+            person = coordinator.person_manager.update_person(
+                person_id=person_id,
+                name=person_data.get("name"),
+                default_device_id=person_data.get("default_device_id"),
+                linked_device_ids=person_data.get("linked_device_ids"),
+                color=person_data.get("color"),
+                avatar=person_data.get("avatar"),
+            )
+        else:
+            # Create new person
+            person_id = f"person_{person_data['name'].lower().replace(' ', '_')}"
+            person = coordinator.person_manager.add_person(
+                person_id=person_id,
+                name=person_data["name"],
+                default_device_id=person_data["default_device_id"],
+                linked_device_ids=person_data.get("linked_device_ids"),
+                color=person_data.get("color", "#2196F3"),
+                avatar=person_data.get("avatar"),
+            )
+
+        # Save to storage
+        await coordinator.person_manager.async_save()
+
+        connection.send_result(msg["id"], person.to_dict())
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_data", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error updating person: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_DELETE_PERSON,
+        vol.Required("config_entry_id"): str,
+        vol.Required("person_id"): str,
+    }
+)
+@websocket_api.async_response
+async def handle_delete_person(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Delete a person."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        coordinator.person_manager.delete_person(msg["person_id"])
+        await coordinator.person_manager.async_save()
+
+        connection.send_result(msg["id"], {"success": True})
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error deleting person: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_SET_ACTIVE_DEVICE,
+        vol.Required("config_entry_id"): str,
+        vol.Required("person_id"): str,
+        vol.Required("device_id"): str,
+    }
+)
+@websocket_api.async_response
+async def handle_set_active_device(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Set the active tracking device for a person."""
+    try:
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        person = coordinator.person_manager.set_active_device(
+            msg["person_id"], msg["device_id"]
+        )
+        await coordinator.person_manager.async_save()
+
+        connection.send_result(msg["id"], person.to_dict())
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_data", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error setting active device: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_GET_POSITION_HISTORY,
+        vol.Required("config_entry_id"): str,
+        vol.Required("device_id"): str,
+        vol.Required("start_time"): str,  # ISO format
+        vol.Required("end_time"): str,    # ISO format
+        vol.Optional("limit"): int,
+        vol.Optional("downsample_seconds"): int,
+    }
+)
+@websocket_api.async_response
+async def handle_get_position_history(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Get position history for a device."""
+    try:
+        from datetime import datetime
+
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        start_time = datetime.fromisoformat(msg["start_time"])
+        end_time = datetime.fromisoformat(msg["end_time"])
+
+        positions = await coordinator.history_manager.get_positions(
+            device_id=msg["device_id"],
+            start_time=start_time,
+            end_time=end_time,
+            limit=msg.get("limit"),
+            downsample_seconds=msg.get("downsample_seconds"),
+        )
+
+        result = [
+            {
+                "device_id": p.device_id,
+                "timestamp": p.timestamp,
+                "x": p.x,
+                "y": p.y,
+                "confidence": p.confidence,
+                "method": p.method,
+            }
+            for p in positions
+        ]
+
+        connection.send_result(msg["id"], {"positions": result})
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_data", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error getting position history: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_GET_HEAT_MAP_DATA,
+        vol.Required("config_entry_id"): str,
+        vol.Required("device_id"): str,
+        vol.Required("start_time"): str,  # ISO format
+        vol.Required("end_time"): str,    # ISO format
+        vol.Optional("grid_size"): float,
+    }
+)
+@websocket_api.async_response
+async def handle_get_heat_map_data(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Get heat map data for a device."""
+    try:
+        from datetime import datetime
+
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        start_time = datetime.fromisoformat(msg["start_time"])
+        end_time = datetime.fromisoformat(msg["end_time"])
+        grid_size = msg.get("grid_size", 0.5)
+
+        heat_map_data = await coordinator.history_manager.get_heat_map_data(
+            device_id=msg["device_id"],
+            start_time=start_time,
+            end_time=end_time,
+            grid_size=grid_size,
+        )
+
+        # Convert tuple keys to strings for JSON serialization
+        data = {f"{k[0]},{k[1]}": v for k, v in heat_map_data.items()}
+
+        connection.send_result(msg["id"], {"grid_size": grid_size, "data": data})
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_data", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error getting heat map data: %s", err)
+        connection.send_error(msg["id"], "unknown_error", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TYPE_GET_TIMELINE_POSITIONS,
+        vol.Required("config_entry_id"): str,
+        vol.Required("device_id"): str,
+        vol.Required("start_time"): str,  # ISO format
+        vol.Required("end_time"): str,    # ISO format
+        vol.Optional("interval_seconds"): int,
+    }
+)
+@websocket_api.async_response
+async def handle_get_timeline_positions(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Get downsampled positions for timeline playback."""
+    try:
+        from datetime import datetime
+
+        coordinator = _get_coordinator(hass, msg["config_entry_id"])
+
+        start_time = datetime.fromisoformat(msg["start_time"])
+        end_time = datetime.fromisoformat(msg["end_time"])
+        interval_seconds = msg.get("interval_seconds", 5)
+
+        positions = await coordinator.history_manager.get_positions(
+            device_id=msg["device_id"],
+            start_time=start_time,
+            end_time=end_time,
+            downsample_seconds=interval_seconds,
+        )
+
+        result = [
+            {
+                "device_id": p.device_id,
+                "timestamp": p.timestamp,
+                "x": p.x,
+                "y": p.y,
+                "confidence": p.confidence,
+                "method": p.method,
+            }
+            for p in positions
+        ]
+
+        connection.send_result(msg["id"], {"positions": result, "interval": interval_seconds})
+
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_data", str(err))
+    except Exception as err:
+        _LOGGER.exception("Error getting timeline positions: %s", err)
         connection.send_error(msg["id"], "unknown_error", str(err))
