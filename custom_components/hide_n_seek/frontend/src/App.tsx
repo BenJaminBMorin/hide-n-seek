@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Box,
   Container,
@@ -82,6 +82,11 @@ export const App: React.FC<AppProps> = ({ hass }) => {
   const [visualizationModes, setVisualizationModes] = useState<string[]>(['live']);
   const [historicalPositions, setHistoricalPositions] = useState<Record<string, PositionRecord[]>>({});
 
+  // Track initialization state to prevent duplicate initializations
+  const initializingRef = useRef(false);
+  const initializedRef = useRef(false);
+  const wsRef = useRef<HideNSeekWebSocket | null>(null);
+
   useEffect(() => {
     // Wait for hass object to be available
     if (!hass || !hass.connection) {
@@ -91,6 +96,12 @@ export const App: React.FC<AppProps> = ({ hass }) => {
       return;
     }
 
+    // Prevent duplicate initializations
+    if (initializingRef.current || initializedRef.current) {
+      return;
+    }
+
+    initializingRef.current = true;
     console.log('=== Hide-n-Seek Panel Initializing ===');
     console.log('Hass connection available');
 
@@ -98,7 +109,6 @@ export const App: React.FC<AppProps> = ({ hass }) => {
     const initializePanel = async () => {
       try {
         console.log('Step 1: Searching for hide_n_seek entities in states...');
-        console.log('Available states:', Object.keys(hass.states).slice(0, 10), '... and more');
 
         // Find all hide_n_seek entities
         const hideNSeekEntityIds = Object.keys(hass.states).filter(entityId =>
@@ -111,26 +121,19 @@ export const App: React.FC<AppProps> = ({ hass }) => {
           throw new Error('No Hide-n-Seek entities found. Please ensure the integration is configured and has created entities.');
         }
 
-        // Get the first entity's state
-        const firstEntity = hass.states[hideNSeekEntityIds[0]];
-        console.log('First entity:', hideNSeekEntityIds[0]);
-        console.log('Entity object:', firstEntity);
-        console.log('Entity attributes:', firstEntity.attributes);
-
         // Try to get config entry ID from the entity registry
         let configEntryId: string | null = null;
 
         // Try getting from entity registry
         try {
-          console.log('Step 2: Trying to get entity info from registry...');
+          console.log('Step 2: Getting config entry ID from entity registry...');
           const entityInfo: any = await hass.callWS({
             type: 'config/entity_registry/get',
             entity_id: hideNSeekEntityIds[0]
           });
-          console.log('Entity registry info:', entityInfo);
           if (entityInfo && entityInfo.config_entry_id) {
             configEntryId = entityInfo.config_entry_id;
-            console.log('Found config_entry_id from entity registry:', configEntryId);
+            console.log('Found config_entry_id:', configEntryId);
           }
         } catch (err) {
           console.log('Could not get entity from registry:', err);
@@ -140,26 +143,25 @@ export const App: React.FC<AppProps> = ({ hass }) => {
           throw new Error('Could not determine config entry ID. Please report this issue with the console logs.');
         }
 
-        console.log('Step 3: Using config entry ID:', configEntryId);
-
-        console.log('Step 4: Creating WebSocket wrapper...');
+        console.log('Step 3: Creating WebSocket wrapper...');
         const websocket = new HideNSeekWebSocket(hass, configEntryId);
+        wsRef.current = websocket;
 
         await websocket.connect();
-        console.log('Step 5: Connection established');
+        console.log('Step 4: Connection established');
 
         setConnected(true);
         setWs(websocket);
         setError(null);
 
-        console.log('Step 6: Fetching initial data...');
+        console.log('Step 5: Fetching initial data...');
         const [mapData, floorPlanData, personsData] = await Promise.all([
           websocket.getMapData(),
           websocket.getFloorPlan(),
           websocket.getPersons(),
         ]);
 
-        console.log('Step 7: Data received, updating UI...');
+        console.log('Step 6: Data received, updating UI...');
         setSensors(mapData.sensors);
         setDevices(mapData.devices);
         setZones(mapData.zones);
@@ -169,6 +171,7 @@ export const App: React.FC<AppProps> = ({ hass }) => {
         setLoading(false);
 
         console.log('=== Panel Initialized Successfully ===');
+        initializedRef.current = true;
 
         return websocket;
       } catch (err: any) {
@@ -176,30 +179,26 @@ export const App: React.FC<AppProps> = ({ hass }) => {
         console.error('Error:', err);
         setError(err.message || 'Failed to initialize panel');
         setLoading(false);
+        initializingRef.current = false;
         throw err;
       }
     };
 
-    let cleanup: (() => void) | null = null;
-
-    initializePanel()
-      .then(ws => {
-        cleanup = () => {
-          if (ws && typeof ws.disconnect === 'function') {
-            ws.disconnect();
-          }
-        };
-      })
-      .catch(() => {
-        // Error already handled in initializePanel
-      });
+    initializePanel().catch(() => {
+      // Error already handled in initializePanel
+    });
 
     return () => {
-      if (cleanup) {
-        cleanup();
+      // Cleanup on unmount
+      if (wsRef.current && typeof wsRef.current.disconnect === 'function') {
+        console.log('Cleaning up WebSocket connection...');
+        wsRef.current.disconnect();
+        wsRef.current = null;
       }
+      initializedRef.current = false;
+      initializingRef.current = false;
     };
-  }, [hass]);
+  }, [hass?.connection]);
 
   useEffect(() => {
     if (!ws || !connected) return;
