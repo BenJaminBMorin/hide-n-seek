@@ -94,40 +94,72 @@ export const App: React.FC<AppProps> = ({ hass }) => {
     console.log('=== Hide-n-Seek Panel Initializing ===');
     console.log('Hass connection available');
 
-    // FIRST: Query for the actual config entry ID
+    // FIRST: Find the config entry ID from entity states
     const initializePanel = async () => {
       try {
-        console.log('Step 1: Fetching config entries...');
-        const entries: any[] = await hass.callWS({ type: 'config_entry/list' });
-        console.log('All config entries:', entries.map(e => ({ domain: e.domain, entry_id: e.entry_id, title: e.title })));
+        console.log('Step 1: Searching for hide_n_seek entities in states...');
+        console.log('Available states:', Object.keys(hass.states).slice(0, 10), '... and more');
 
-        const hideNSeekEntry = entries.find((e: any) => e.domain === 'hide_n_seek');
+        // Find all hide_n_seek entities
+        const hideNSeekEntityIds = Object.keys(hass.states).filter(entityId =>
+          entityId.includes('hide_n_seek') || entityId.includes('hide-n-seek')
+        );
 
-        if (!hideNSeekEntry) {
-          throw new Error('Hide-n-Seek integration not found. Please configure it in Settings → Devices & Services');
+        console.log('Found hide_n_seek entities:', hideNSeekEntityIds);
+
+        if (hideNSeekEntityIds.length === 0) {
+          throw new Error('No Hide-n-Seek entities found. Please ensure the integration is configured and has created entities.');
         }
 
-        const configEntryId = hideNSeekEntry.entry_id;
-        console.log('Step 2: Found Hide-n-Seek entry:', hideNSeekEntry.title, 'with ID:', configEntryId);
+        // Get the first entity's state
+        const firstEntity = hass.states[hideNSeekEntityIds[0]];
+        console.log('First entity:', hideNSeekEntityIds[0]);
+        console.log('Entity object:', firstEntity);
+        console.log('Entity attributes:', firstEntity.attributes);
 
-        console.log('Step 3: Creating WebSocket wrapper...');
+        // Try to get config entry ID from the entity registry
+        let configEntryId: string | null = null;
+
+        // Try getting from entity registry
+        try {
+          console.log('Step 2: Trying to get entity info from registry...');
+          const entityInfo: any = await hass.callWS({
+            type: 'config/entity_registry/get',
+            entity_id: hideNSeekEntityIds[0]
+          });
+          console.log('Entity registry info:', entityInfo);
+          if (entityInfo && entityInfo.config_entry_id) {
+            configEntryId = entityInfo.config_entry_id;
+            console.log('Found config_entry_id from entity registry:', configEntryId);
+          }
+        } catch (err) {
+          console.log('Could not get entity from registry:', err);
+        }
+
+        if (!configEntryId) {
+          throw new Error('Could not determine config entry ID. Please report this issue with the console logs.');
+        }
+
+        console.log('Step 3: Using config entry ID:', configEntryId);
+
+        console.log('Step 4: Creating WebSocket wrapper...');
         const websocket = new HideNSeekWebSocket(hass, configEntryId);
 
         await websocket.connect();
-        console.log('Step 4: Connection established');
+        console.log('Step 5: Connection established');
 
         setConnected(true);
         setWs(websocket);
         setError(null);
 
-        console.log('Step 5: Fetching initial data...');
+        console.log('Step 6: Fetching initial data...');
         const [mapData, floorPlanData, personsData] = await Promise.all([
           websocket.getMapData(),
           websocket.getFloorPlan(),
           websocket.getPersons(),
         ]);
 
-        console.log('Step 6: Data received, updating UI...');
+        console.log('Step 7: Data received, updating UI...');
         setSensors(mapData.sensors);
         setDevices(mapData.devices);
         setZones(mapData.zones);
