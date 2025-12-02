@@ -98,7 +98,7 @@ export const App: React.FC<AppProps> = ({ hass }) => {
     const initializePanel = async () => {
       try {
         console.log('Step 1: Fetching config entries...');
-        const entries: any[] = await hass.callWS({ type: 'config/config_entries/list' });
+        const entries: any[] = await hass.callWS({ type: 'config_entry/list' });
         console.log('All config entries:', entries.map(e => ({ domain: e.domain, entry_id: e.entry_id, title: e.title })));
 
         const hideNSeekEntry = entries.find((e: any) => e.domain === 'hide_n_seek');
