@@ -92,28 +92,53 @@ export const App: React.FC<AppProps> = ({ hass }) => {
     }
 
     console.log('Hass connection available, initializing...');
+    console.log('Hass states:', Object.keys(hass.states || {}).filter(k => k.includes('hide')));
+    console.log('Hass config:', hass.config);
 
-    // Find the config entry ID from hass
-    let configEntryId = 'hide_n_seek_default';
+    // Find the config entry ID from hass states
+    let configEntryId: string | null = null;
 
-    // Try to find the actual config entry ID from entities
-    if (hass.entities) {
-      // Look for any hide_n_seek entity
-      const hideNSeekEntity = Object.keys(hass.entities).find(key => key.startsWith('sensor.') && key.includes('hide_n_seek'));
-      if (hideNSeekEntity) {
-        const entity = hass.entities[hideNSeekEntity];
-        if (entity.platform === 'hide_n_seek') {
-          configEntryId = entity.platform;
+    // Look through all states for hide_n_seek entities
+    if (hass.states) {
+      const hideNSeekEntities = Object.keys(hass.states).filter(key =>
+        key.includes('hide_n_seek') || key.includes('hide-n-seek')
+      );
+      console.log('Found hide_n_seek entities:', hideNSeekEntities);
+
+      if (hideNSeekEntities.length > 0) {
+        // Get the first entity and check its attributes for entry_id
+        const firstEntity = hass.states[hideNSeekEntities[0]];
+        console.log('First entity:', firstEntity);
+        console.log('Entity attributes:', firstEntity.attributes);
+
+        // The entry_id might be in various places
+        if (firstEntity.attributes && firstEntity.attributes.entry_id) {
+          configEntryId = firstEntity.attributes.entry_id;
+        } else if (firstEntity.context && firstEntity.context.id) {
+          configEntryId = firstEntity.context.id;
         }
       }
     }
 
-    // Try to get from config entries
-    if (hass.config && hass.config.entries) {
-      const hideNSeekEntry = Object.values(hass.config.entries).find((entry: any) => entry.domain === 'hide_n_seek');
-      if (hideNSeekEntry) {
-        configEntryId = (hideNSeekEntry as any).entry_id;
-      }
+    // If we still don't have it, try to list all integrations
+    if (!configEntryId) {
+      console.log('Calling config/entry/list to find config entry...');
+      // Use hass API to get config entries
+      hass.callWS({ type: 'config/config_entries/list' })
+        .then((entries: any[]) => {
+          console.log('All config entries:', entries);
+          const hideNSeekEntry = entries.find(e => e.domain === 'hide_n_seek');
+          console.log('Hide-n-seek entry:', hideNSeekEntry);
+          if (hideNSeekEntry) {
+            console.log('Found config entry ID:', hideNSeekEntry.entry_id);
+          }
+        })
+        .catch((err: any) => console.error('Failed to get config entries:', err));
+    }
+
+    if (!configEntryId) {
+      console.error('Could not find config entry ID, using default');
+      configEntryId = 'hide_n_seek_default';
     }
 
     console.log('Using config entry ID:', configEntryId);

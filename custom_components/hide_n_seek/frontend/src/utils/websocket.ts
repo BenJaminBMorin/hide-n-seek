@@ -254,7 +254,11 @@ export class HideNSeekWebSocket {
 
   disconnect(): void {
     // Unsubscribe from all events
-    this.unsubscribers.forEach(unsub => unsub());
+    this.unsubscribers.forEach(unsub => {
+      if (typeof unsub === 'function') {
+        unsub();
+      }
+    });
     this.unsubscribers = [];
   }
 }
