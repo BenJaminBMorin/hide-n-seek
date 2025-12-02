@@ -41,6 +41,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         hass,
         webcomponent_name=PANEL_NAME,
         frontend_url_path="hide-n-seek",
+        js_url=f"{PANEL_URL}/hide-n-seek-panel.js",
         config={
             "name": PANEL_TITLE,
         },
