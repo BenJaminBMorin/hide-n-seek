@@ -83,18 +83,55 @@ export const App: React.FC<AppProps> = ({ hass }) => {
   const [historicalPositions, setHistoricalPositions] = useState<Record<string, PositionRecord[]>>({});
 
   useEffect(() => {
+    // Debug logging
+    console.log('Hass object:', hass);
+    console.log('Hass keys:', hass ? Object.keys(hass) : 'no hass');
+    console.log('Hass auth:', hass?.auth);
+    console.log('Hass connection:', hass?.connection);
+
     // Wait for hass object to be available
-    if (!hass || !hass.auth || !hass.auth.data || !hass.auth.data.access_token) {
+    if (!hass) {
+      console.log('No hass object yet');
+      setLoading(true);
+      setError(null);
+      return;
+    }
+
+    // Try different auth token locations
+    let AUTH_TOKEN = null;
+
+    // Method 1: hass.auth.data.access_token
+    if (hass.auth?.data?.access_token) {
+      AUTH_TOKEN = hass.auth.data.access_token;
+      console.log('Found token in hass.auth.data.access_token');
+    }
+    // Method 2: hass.auth.accessToken
+    else if (hass.auth?.accessToken) {
+      AUTH_TOKEN = hass.auth.accessToken;
+      console.log('Found token in hass.auth.accessToken');
+    }
+    // Method 3: Check if connection already exists
+    else if (hass.connection) {
+      console.log('Hass has existing connection, attempting to use it');
+      // We have a connection, let's try to get the token differently
+      AUTH_TOKEN = hass.connection.accessToken;
+      console.log('Token from connection:', AUTH_TOKEN);
+    }
+
+    if (!AUTH_TOKEN) {
+      console.error('Could not find auth token in hass object');
       setLoading(false);
-      setError('Waiting for Home Assistant connection...');
+      setError('Could not find authentication token. Hass object structure: ' + JSON.stringify(Object.keys(hass), null, 2));
       return;
     }
 
     // Get WebSocket URL and auth token from hass
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const WS_URL = `${protocol}//${window.location.host}/api/websocket`;
-    const AUTH_TOKEN = hass.auth.data.access_token;
     const CONFIG_ENTRY_ID = window.__hideNSeekConfigEntryId || 'hide_n_seek_default';
+
+    console.log('Connecting to WebSocket:', WS_URL);
+    console.log('Config entry ID:', CONFIG_ENTRY_ID);
 
     const websocket = new HideNSeekWebSocket(CONFIG_ENTRY_ID);
 
