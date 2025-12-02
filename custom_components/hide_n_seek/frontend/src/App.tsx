@@ -180,10 +180,24 @@ export const App: React.FC<AppProps> = ({ hass }) => {
       }
     };
 
-    const websocketPromise = initializePanel();
+    let cleanup: (() => void) | null = null;
+
+    initializePanel()
+      .then(ws => {
+        cleanup = () => {
+          if (ws && typeof ws.disconnect === 'function') {
+            ws.disconnect();
+          }
+        };
+      })
+      .catch(() => {
+        // Error already handled in initializePanel
+      });
 
     return () => {
-      websocketPromise.then(ws => ws?.disconnect()).catch(() => {});
+      if (cleanup) {
+        cleanup();
+      }
     };
   }, [hass]);
 
