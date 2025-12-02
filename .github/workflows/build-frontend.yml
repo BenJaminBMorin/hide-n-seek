@@ -1,12 +1,13 @@
 name: Build Frontend
 
 on:
-  push:
-    branches:
-      - main
-  release:
-    types: [published]
+  # Manual trigger only - build locally for development
+  # This workflow just verifies the frontend can build successfully
   workflow_dispatch:
+  # Optionally run on PRs to verify builds don't break
+  pull_request:
+    paths:
+      - 'custom_components/hide_n_seek/frontend/**'
 
 jobs:
   build:
@@ -26,32 +27,15 @@ jobs:
         working-directory: custom_components/hide_n_seek/frontend
         run: npm ci
 
-      - name: Build frontend
+      - name: Build frontend (verification)
         working-directory: custom_components/hide_n_seek/frontend
         run: npm run build
 
-      - name: Commit built files
+      - name: Check build output
         run: |
-          git config --global user.name 'GitHub Actions'
-          git config --global user.email 'actions@github.com'
-          git add custom_components/hide_n_seek/frontend/dist/
-          git diff --quiet && git diff --staged --quiet || git commit -m "build: Update frontend build [skip ci]"
-          git push
-
-      - name: Create release asset
-        if: github.event_name == 'release'
-        run: |
-          cd custom_components
-          zip -r ../hide-n-seek.zip hide_n_seek/
-          cd ..
-
-      - name: Upload release asset
-        if: github.event_name == 'release'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./hide-n-seek.zip
-          asset_name: hide-n-seek.zip
-          asset_content_type: application/zip
+          if [ ! -f custom_components/hide_n_seek/frontend/dist/hide-n-seek-panel.js ]; then
+            echo "Build failed: hide-n-seek-panel.js not found"
+            exit 1
+          fi
+          echo "✅ Build successful!"
+          ls -lh custom_components/hide_n_seek/frontend/dist/
