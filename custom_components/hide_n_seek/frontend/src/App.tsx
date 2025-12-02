@@ -91,73 +91,43 @@ export const App: React.FC<AppProps> = ({ hass }) => {
       return;
     }
 
-    console.log('Hass connection available, initializing...');
-    console.log('Hass states:', Object.keys(hass.states || {}).filter(k => k.includes('hide')));
-    console.log('Hass config:', hass.config);
+    console.log('=== Hide-n-Seek Panel Initializing ===');
+    console.log('Hass connection available');
 
-    // Find the config entry ID from hass states
-    let configEntryId: string | null = null;
+    // FIRST: Query for the actual config entry ID
+    const initializePanel = async () => {
+      try {
+        console.log('Step 1: Fetching config entries...');
+        const entries: any[] = await hass.callWS({ type: 'config/config_entries/list' });
+        console.log('All config entries:', entries.map(e => ({ domain: e.domain, entry_id: e.entry_id, title: e.title })));
 
-    // Look through all states for hide_n_seek entities
-    if (hass.states) {
-      const hideNSeekEntities = Object.keys(hass.states).filter(key =>
-        key.includes('hide_n_seek') || key.includes('hide-n-seek')
-      );
-      console.log('Found hide_n_seek entities:', hideNSeekEntities);
+        const hideNSeekEntry = entries.find((e: any) => e.domain === 'hide_n_seek');
 
-      if (hideNSeekEntities.length > 0) {
-        // Get the first entity and check its attributes for entry_id
-        const firstEntity = hass.states[hideNSeekEntities[0]];
-        console.log('First entity:', firstEntity);
-        console.log('Entity attributes:', firstEntity.attributes);
-
-        // The entry_id might be in various places
-        if (firstEntity.attributes && firstEntity.attributes.entry_id) {
-          configEntryId = firstEntity.attributes.entry_id;
-        } else if (firstEntity.context && firstEntity.context.id) {
-          configEntryId = firstEntity.context.id;
+        if (!hideNSeekEntry) {
+          throw new Error('Hide-n-Seek integration not found. Please configure it in Settings → Devices & Services');
         }
-      }
-    }
 
-    // If we still don't have it, try to list all integrations
-    if (!configEntryId) {
-      console.log('Calling config/entry/list to find config entry...');
-      // Use hass API to get config entries
-      hass.callWS({ type: 'config/config_entries/list' })
-        .then((entries: any[]) => {
-          console.log('All config entries:', entries);
-          const hideNSeekEntry = entries.find(e => e.domain === 'hide_n_seek');
-          console.log('Hide-n-seek entry:', hideNSeekEntry);
-          if (hideNSeekEntry) {
-            console.log('Found config entry ID:', hideNSeekEntry.entry_id);
-          }
-        })
-        .catch((err: any) => console.error('Failed to get config entries:', err));
-    }
+        const configEntryId = hideNSeekEntry.entry_id;
+        console.log('Step 2: Found Hide-n-Seek entry:', hideNSeekEntry.title, 'with ID:', configEntryId);
 
-    if (!configEntryId) {
-      console.error('Could not find config entry ID, using default');
-      configEntryId = 'hide_n_seek_default';
-    }
+        console.log('Step 3: Creating WebSocket wrapper...');
+        const websocket = new HideNSeekWebSocket(hass, configEntryId);
 
-    console.log('Using config entry ID:', configEntryId);
+        await websocket.connect();
+        console.log('Step 4: Connection established');
 
-    const websocket = new HideNSeekWebSocket(hass, configEntryId);
-
-    websocket
-      .connect()
-      .then(() => {
         setConnected(true);
         setWs(websocket);
         setError(null);
-        return Promise.all([
+
+        console.log('Step 5: Fetching initial data...');
+        const [mapData, floorPlanData, personsData] = await Promise.all([
           websocket.getMapData(),
           websocket.getFloorPlan(),
           websocket.getPersons(),
         ]);
-      })
-      .then(([mapData, floorPlanData, personsData]) => {
+
+        console.log('Step 6: Data received, updating UI...');
         setSensors(mapData.sensors);
         setDevices(mapData.devices);
         setZones(mapData.zones);
@@ -165,15 +135,23 @@ export const App: React.FC<AppProps> = ({ hass }) => {
         setFloorPlan(floorPlanData);
         setPersons(personsData);
         setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Failed to initialize:', err);
-        setError(err.message || 'Failed to connect');
+
+        console.log('=== Panel Initialized Successfully ===');
+
+        return websocket;
+      } catch (err: any) {
+        console.error('=== Initialization Failed ===');
+        console.error('Error:', err);
+        setError(err.message || 'Failed to initialize panel');
         setLoading(false);
-      });
+        throw err;
+      }
+    };
+
+    const websocketPromise = initializePanel();
 
     return () => {
-      websocket.disconnect();
+      websocketPromise.then(ws => ws?.disconnect()).catch(() => {});
     };
   }, [hass]);
 
