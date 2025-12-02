@@ -1,0 +1,295 @@
+# Example Hide-n-Seek Configuration
+# This file shows example automations and service calls
+
+# ============================================
+# Service Calls
+# ============================================
+
+# Add a sensor
+add_living_room_sensor:
+  service: hide_n_seek.add_sensor
+  data:
+    sensor_id: living_room_esp32
+    name: "Living Room Sensor"
+    type: esphome
+    location: [0, 0]
+    metadata:
+      floor: ground
+      room: living_room
+
+add_bedroom_sensor:
+  service: hide_n_seek.add_sensor
+  data:
+    sensor_id: bedroom_esp32
+    name: "Bedroom Sensor"
+    type: esphome
+    location: [10, 0]
+
+add_kitchen_sensor:
+  service: hide_n_seek.add_sensor
+  data:
+    sensor_id: kitchen_esp32
+    name: "Kitchen Sensor"
+    type: mqtt
+    location: [5, 8]
+
+# Add a tracked device
+add_phone:
+  service: hide_n_seek.add_tracked_device
+  data:
+    device_id: johns_phone
+    name: "John's Phone"
+    mac_address: "AA:BB:CC:DD:EE:FF"
+
+# Create zones
+create_couch_zone:
+  service: hide_n_seek.create_zone
+  data:
+    name: "Couch Area"
+    coordinates:
+      - [0, 0]
+      - [2, 0]
+      - [2, 1.5]
+      - [0, 1.5]
+
+create_kitchen_zone:
+  service: hide_n_seek.create_zone
+  data:
+    name: "Kitchen"
+    coordinates:
+      - [3, 6]
+      - [7, 6]
+      - [7, 10]
+      - [3, 10]
+
+create_bedroom_zone:
+  service: hide_n_seek.create_zone
+  data:
+    name: "Bedroom"
+    coordinates:
+      - [8, 0]
+      - [12, 0]
+      - [12, 4]
+      - [8, 4]
+
+# ============================================
+# Automations
+# ============================================
+
+automation:
+  # Turn on lights when entering a room
+  - id: lights_on_living_room
+    alias: "Lights on in Living Room"
+    description: "Turn on living room lights when someone enters"
+    trigger:
+      - platform: event
+        event_type: hide_n_seek_zone_entered
+        event_data:
+          zone_name: "Living Room"
+    condition:
+      - condition: sun
+        after: sunset
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.living_room
+        data:
+          brightness_pct: 80
+          transition: 2
+
+  # Turn off lights when leaving a room
+  - id: lights_off_living_room
+    alias: "Lights off in Living Room"
+    description: "Turn off lights when room is empty"
+    trigger:
+      - platform: event
+        event_type: hide_n_seek_zone_exited
+        event_data:
+          zone_name: "Living Room"
+    action:
+      - delay:
+          minutes: 5
+      - service: light.turn_off
+        target:
+          entity_id: light.living_room
+        data:
+          transition: 2
+
+  # Play music when entering kitchen
+  - id: music_in_kitchen
+    alias: "Kitchen Music"
+    description: "Start playing music when entering kitchen"
+    trigger:
+      - platform: event
+        event_type: hide_n_seek_zone_entered
+        event_data:
+          zone_name: "Kitchen"
+    action:
+      - service: media_player.play_media
+        target:
+          entity_id: media_player.kitchen_speaker
+        data:
+          media_content_type: playlist
+          media_content_id: "spotify:playlist:morning_cooking"
+
+  # Bedtime automation
+  - id: bedtime_routine
+    alias: "Bedtime Routine"
+    description: "Run bedtime routine when entering bedroom at night"
+    trigger:
+      - platform: event
+        event_type: hide_n_seek_zone_entered
+        event_data:
+          zone_name: "Bedroom"
+    condition:
+      - condition: time
+        after: "22:00:00"
+        before: "06:00:00"
+    action:
+      - service: scene.turn_on
+        target:
+          entity_id: scene.bedtime
+      - service: notify.mobile_app
+        data:
+          message: "Good night! Bedtime mode activated."
+
+  # Security alert
+  - id: security_alert_zone_entry
+    alias: "Security Alert - Unexpected Zone Entry"
+    description: "Alert when someone enters a zone during away mode"
+    trigger:
+      - platform: event
+        event_type: hide_n_seek_zone_entered
+    condition:
+      - condition: state
+        entity_id: alarm_control_panel.home
+        state: armed_away
+    action:
+      - service: notify.mobile_app
+        data:
+          message: >
+            Alert: {{ trigger.event.data.device_id }} detected in
+            {{ trigger.event.data.zone_name }} while system is armed!
+          title: "Security Alert"
+      - service: camera.snapshot
+        target:
+          entity_id: camera.living_room
+        data:
+          filename: /config/www/snapshots/alert_{{ now().timestamp() }}.jpg
+
+  # Position-based climate control
+  - id: climate_follow_presence
+    alias: "Climate Follow Presence"
+    description: "Adjust thermostat based on room occupancy"
+    trigger:
+      - platform: event
+        event_type: hide_n_seek_device_position_update
+    condition:
+      - condition: template
+        value_template: "{{ trigger.event.data.confidence > 0.7 }}"
+    action:
+      - service: climate.set_temperature
+        target:
+          entity_id: climate.living_room
+        data:
+          temperature: 21
+
+  # Track kids location
+  - id: kids_location_tracking
+    alias: "Kids Location Tracking"
+    description: "Log when kids move between zones"
+    trigger:
+      - platform: event
+        event_type: hide_n_seek_zone_entered
+        event_data:
+          device_id: kids_tablet
+      - platform: event
+        event_type: hide_n_seek_zone_exited
+        event_data:
+          device_id: kids_tablet
+    action:
+      - service: logbook.log
+        data:
+          name: "Kids Activity"
+          message: >
+            {% if trigger.event.event_type == 'hide_n_seek_zone_entered' %}
+              Entered {{ trigger.event.data.zone_name }}
+            {% else %}
+              Left {{ trigger.event.data.zone_name }}
+            {% endif %}
+
+# ============================================
+# Template Sensors
+# ============================================
+
+template:
+  - sensor:
+      # Count devices in a zone
+      - name: "Living Room Occupancy Count"
+        unique_id: living_room_occupancy_count
+        state: >
+          {{ states.device_tracker
+             | selectattr('attributes.zones', 'defined')
+             | selectattr('attributes.zones', 'search', 'Living Room')
+             | list | count }}
+
+      # Get position of a specific device
+      - name: "John's Phone Position"
+        unique_id: johns_phone_position
+        state: >
+          {% set x = state_attr('sensor.johns_phone_x_position', 'state') %}
+          {% set y = state_attr('sensor.johns_phone_y_position', 'state') %}
+          ({{ x }}, {{ y }})
+
+  - binary_sensor:
+      # Check if anyone is in a zone
+      - name: "Living Room Occupied"
+        unique_id: living_room_occupied
+        device_class: occupancy
+        state: >
+          {{ states.device_tracker
+             | selectattr('attributes.zones', 'defined')
+             | selectattr('attributes.zones', 'search', 'Living Room')
+             | list | count > 0 }}
+
+# ============================================
+# Scripts
+# ============================================
+
+script:
+  # Welcome home routine
+  welcome_home:
+    alias: "Welcome Home"
+    sequence:
+      - service: light.turn_on
+        target:
+          area_id: entryway
+      - delay:
+          seconds: 2
+      - service: media_player.play_media
+        target:
+          entity_id: media_player.whole_house
+        data:
+          media_content_type: music
+          media_content_id: "spotify:playlist:welcome_home"
+
+  # Room-to-room music follow
+  music_follow:
+    alias: "Music Follow Me"
+    sequence:
+      - service: media_player.play_media
+        target:
+          entity_id: >
+            {% set zones = state_attr('device_tracker.my_phone', 'zones') %}
+            {% if 'Living Room' in zones %}
+              media_player.living_room
+            {% elif 'Kitchen' in zones %}
+              media_player.kitchen
+            {% elif 'Bedroom' in zones %}
+              media_player.bedroom
+            {% else %}
+              media_player.whole_house
+            {% endif %}
+        data:
+          media_content_type: music
+          media_content_id: "{{ states('input_text.current_playlist') }}"
