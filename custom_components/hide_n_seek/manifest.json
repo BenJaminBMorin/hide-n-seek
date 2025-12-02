@@ -14,7 +14,8 @@
   "requirements": [
     "numpy>=1.24.0",
     "scipy>=1.10.0",
-    "paho-mqtt>=1.6.1"
+    "paho-mqtt>=1.6.1",
+    "aiosqlite>=0.19.0"
   ],
   "version": "0.1.6"
 }
