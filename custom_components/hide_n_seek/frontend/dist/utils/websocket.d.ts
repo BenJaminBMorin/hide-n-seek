@@ -1,17 +1,10 @@
 import { MapData, PositionUpdateEvent, ZoneEvent, Zone, Sensor, FloorPlan, Room, Person, PositionRecord } from '../types';
 export declare class HideNSeekWebSocket {
-    private ws;
-    private messageId;
-    private callbacks;
-    private subscriptions;
+    private hass;
     private configEntryId;
-    private reconnectTimeout;
-    private reconnectDelay;
-    constructor(configEntryId: string);
-    connect(url: string, authToken: string): Promise<void>;
-    private scheduleReconnect;
-    private handleMessage;
-    private send;
+    private unsubscribers;
+    constructor(hass: any, configEntryId: string);
+    connect(): Promise<void>;
     getMapData(): Promise<MapData>;
     subscribeToPositions(callback: (event: PositionUpdateEvent) => void): () => void;
     subscribeToZones(callback: (event: ZoneEvent, eventType: string) => void): () => void;

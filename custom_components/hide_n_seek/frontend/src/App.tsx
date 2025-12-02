@@ -83,60 +83,45 @@ export const App: React.FC<AppProps> = ({ hass }) => {
   const [historicalPositions, setHistoricalPositions] = useState<Record<string, PositionRecord[]>>({});
 
   useEffect(() => {
-    // Debug logging
-    console.log('Hass object:', hass);
-    console.log('Hass keys:', hass ? Object.keys(hass) : 'no hass');
-    console.log('Hass auth:', hass?.auth);
-    console.log('Hass connection:', hass?.connection);
-
     // Wait for hass object to be available
-    if (!hass) {
-      console.log('No hass object yet');
+    if (!hass || !hass.connection) {
+      console.log('Waiting for hass connection...');
       setLoading(true);
       setError(null);
       return;
     }
 
-    // Try different auth token locations
-    let AUTH_TOKEN = null;
+    console.log('Hass connection available, initializing...');
 
-    // Method 1: hass.auth.data.access_token
-    if (hass.auth?.data?.access_token) {
-      AUTH_TOKEN = hass.auth.data.access_token;
-      console.log('Found token in hass.auth.data.access_token');
-    }
-    // Method 2: hass.auth.accessToken
-    else if (hass.auth?.accessToken) {
-      AUTH_TOKEN = hass.auth.accessToken;
-      console.log('Found token in hass.auth.accessToken');
-    }
-    // Method 3: Check if connection already exists
-    else if (hass.connection) {
-      console.log('Hass has existing connection, attempting to use it');
-      // We have a connection, let's try to get the token differently
-      AUTH_TOKEN = hass.connection.accessToken;
-      console.log('Token from connection:', AUTH_TOKEN);
+    // Find the config entry ID from hass
+    let configEntryId = 'hide_n_seek_default';
+
+    // Try to find the actual config entry ID from entities
+    if (hass.entities) {
+      // Look for any hide_n_seek entity
+      const hideNSeekEntity = Object.keys(hass.entities).find(key => key.startsWith('sensor.') && key.includes('hide_n_seek'));
+      if (hideNSeekEntity) {
+        const entity = hass.entities[hideNSeekEntity];
+        if (entity.platform === 'hide_n_seek') {
+          configEntryId = entity.platform;
+        }
+      }
     }
 
-    if (!AUTH_TOKEN) {
-      console.error('Could not find auth token in hass object');
-      setLoading(false);
-      setError('Could not find authentication token. Hass object structure: ' + JSON.stringify(Object.keys(hass), null, 2));
-      return;
+    // Try to get from config entries
+    if (hass.config && hass.config.entries) {
+      const hideNSeekEntry = Object.values(hass.config.entries).find((entry: any) => entry.domain === 'hide_n_seek');
+      if (hideNSeekEntry) {
+        configEntryId = (hideNSeekEntry as any).entry_id;
+      }
     }
 
-    // Get WebSocket URL and auth token from hass
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const WS_URL = `${protocol}//${window.location.host}/api/websocket`;
-    const CONFIG_ENTRY_ID = window.__hideNSeekConfigEntryId || 'hide_n_seek_default';
+    console.log('Using config entry ID:', configEntryId);
 
-    console.log('Connecting to WebSocket:', WS_URL);
-    console.log('Config entry ID:', CONFIG_ENTRY_ID);
-
-    const websocket = new HideNSeekWebSocket(CONFIG_ENTRY_ID);
+    const websocket = new HideNSeekWebSocket(hass, configEntryId);
 
     websocket
-      .connect(WS_URL, AUTH_TOKEN)
+      .connect()
       .then(() => {
         setConnected(true);
         setWs(websocket);
@@ -157,7 +142,8 @@ export const App: React.FC<AppProps> = ({ hass }) => {
         setLoading(false);
       })
       .catch((err) => {
-        setError(err.message);
+        console.error('Failed to initialize:', err);
+        setError(err.message || 'Failed to connect');
         setLoading(false);
       });
 
