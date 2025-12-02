@@ -9,7 +9,7 @@ interface MapCanvasProps {
   selectedZone: Zone | null;
   onZoneClick: (zone: Zone) => void;
   onCanvasClick: (point: Point) => void;
-  editMode: 'view' | 'draw' | 'edit';
+  editMode: 'view' | 'draw' | 'edit' | 'draw_room';
   drawingPoints: Point[];
   floorPlan?: FloorPlan;
   showFloorPlan?: boolean;
@@ -284,8 +284,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     // Draw zones
     zones.forEach((zone) => drawZone(ctx, zone));
 
-    // Draw drawing zone if in draw mode
-    if (editMode === 'draw' && drawingPoints.length > 0) {
+    // Draw drawing zone if in draw mode (zones or rooms)
+    if ((editMode === 'draw' || editMode === 'draw_room') && drawingPoints.length > 0) {
       drawDrawingZone(ctx, drawingPoints);
     }
 

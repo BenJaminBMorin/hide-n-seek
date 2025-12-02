@@ -6,8 +6,8 @@ interface FloorPlanEditorProps {
     onCreateRoom: (name: string, coordinates: Point[], color: string) => Promise<void>;
     onUpdateRoom: (roomId: string, name: string, coordinates: Point[], color: string) => Promise<void>;
     onDeleteRoom: (roomId: string) => Promise<void>;
-    onEditModeChange: (mode: 'view' | 'draw_room') => void;
-    editMode: 'view' | 'draw_room';
+    onEditModeChange: (mode: 'view' | 'draw' | 'edit' | 'draw_room') => void;
+    editMode: 'view' | 'draw' | 'edit' | 'draw_room';
     drawingPoints: Point[];
     onClearDrawing: () => void;
 }

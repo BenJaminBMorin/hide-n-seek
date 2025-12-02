@@ -16,6 +16,7 @@ import { ZoneEditor } from './components/ZoneEditor';
 import { DeviceList } from './components/DeviceList';
 import { SensorStatus } from './components/SensorStatus';
 import { SensorManager } from './components/SensorManager';
+import { FloorPlanEditor } from './components/FloorPlanEditor';
 import { HideNSeekWebSocket } from './utils/websocket';
 import {
   Sensor,
@@ -25,6 +26,7 @@ import {
   Point,
   PositionUpdateEvent,
   ZoneEvent,
+  FloorPlan,
 } from './types';
 
 // Get Home Assistant connection from global context
@@ -61,9 +63,14 @@ export const App: React.FC = () => {
   const [devices, setDevices] = useState<TrackedDevice[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [positions, setPositions] = useState<Record<string, Position>>({});
+  const [floorPlan, setFloorPlan] = useState<FloorPlan>({
+    rooms: [],
+    walls: [],
+    dimensions: { width: 15, height: 12 },
+  });
 
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
-  const [editMode, setEditMode] = useState<'view' | 'draw' | 'edit'>('view');
+  const [editMode, setEditMode] = useState<'view' | 'draw' | 'edit' | 'draw_room'>('view');
   const [drawingPoints, setDrawingPoints] = useState<Point[]>([]);
 
   const [snackbar, setSnackbar] = useState<{
@@ -80,13 +87,17 @@ export const App: React.FC = () => {
       .then(() => {
         setConnected(true);
         setWs(websocket);
-        return websocket.getMapData();
+        return Promise.all([
+          websocket.getMapData(),
+          websocket.getFloorPlan(),
+        ]);
       })
-      .then((data) => {
-        setSensors(data.sensors);
-        setDevices(data.devices);
-        setZones(data.zones);
-        setPositions(data.positions);
+      .then(([mapData, floorPlanData]) => {
+        setSensors(mapData.sensors);
+        setDevices(mapData.devices);
+        setZones(mapData.zones);
+        setPositions(mapData.positions);
+        setFloorPlan(floorPlanData);
         setLoading(false);
       })
       .catch((err) => {
@@ -140,7 +151,7 @@ export const App: React.FC = () => {
   };
 
   const handleCanvasClick = (point: Point) => {
-    if (editMode === 'draw') {
+    if (editMode === 'draw' || editMode === 'draw_room') {
       setDrawingPoints([...drawingPoints, point]);
     }
   };
@@ -231,6 +242,62 @@ export const App: React.FC = () => {
     showSnackbar('Sensor deleted successfully');
   };
 
+  const handleUpdateFloorPlanDimensions = async (width: number, height: number) => {
+    if (!ws) return;
+
+    const updatedFloorPlan = await ws.updateFloorPlanDimensions(width, height);
+    setFloorPlan(updatedFloorPlan);
+    showSnackbar('Floor plan dimensions updated');
+  };
+
+  const handleCreateRoom = async (name: string, coordinates: Point[], color: string) => {
+    if (!ws) return;
+
+    const room = await ws.createRoom({
+      name,
+      coordinates: coordinates.map((p) => [p.x, p.y]),
+      color,
+    });
+
+    setFloorPlan({
+      ...floorPlan,
+      rooms: [...floorPlan.rooms, room],
+    });
+    showSnackbar(`Room "${name}" created successfully`);
+  };
+
+  const handleUpdateRoom = async (
+    roomId: string,
+    name: string,
+    coordinates: Point[],
+    color: string
+  ) => {
+    if (!ws) return;
+
+    const updatedRoom = await ws.updateRoom(roomId, {
+      name,
+      coordinates: coordinates.map((p) => [p.x, p.y]),
+      color,
+    });
+
+    setFloorPlan({
+      ...floorPlan,
+      rooms: floorPlan.rooms.map((r) => (r.id === roomId ? updatedRoom : r)),
+    });
+    showSnackbar(`Room "${name}" updated successfully`);
+  };
+
+  const handleDeleteRoom = async (roomId: string) => {
+    if (!ws) return;
+
+    await ws.deleteRoom(roomId);
+    setFloorPlan({
+      ...floorPlan,
+      rooms: floorPlan.rooms.filter((r) => r.id !== roomId),
+    });
+    showSnackbar('Room deleted successfully');
+  };
+
   if (loading) {
     return (
       <Box
@@ -309,6 +376,8 @@ export const App: React.FC = () => {
                 onCanvasClick={handleCanvasClick}
                 editMode={editMode}
                 drawingPoints={drawingPoints}
+                floorPlan={floorPlan}
+                showFloorPlan={true}
               />
             </Paper>
           </Grid>
@@ -340,6 +409,20 @@ export const App: React.FC = () => {
                   onAddSensor={handleAddSensor}
                   onUpdateSensor={handleUpdateSensor}
                   onDeleteSensor={handleDeleteSensor}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <FloorPlanEditor
+                  floorPlan={floorPlan}
+                  onUpdateDimensions={handleUpdateFloorPlanDimensions}
+                  onCreateRoom={handleCreateRoom}
+                  onUpdateRoom={handleUpdateRoom}
+                  onDeleteRoom={handleDeleteRoom}
+                  onEditModeChange={setEditMode}
+                  editMode={editMode}
+                  drawingPoints={drawingPoints}
+                  onClearDrawing={handleClearDrawing}
                 />
               </Grid>
             </Grid>

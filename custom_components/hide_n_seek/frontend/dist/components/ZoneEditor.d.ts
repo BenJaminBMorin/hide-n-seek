@@ -7,8 +7,8 @@ interface ZoneEditorProps {
     onCreateZone: (name: string, coordinates: Point[], color: string) => void;
     onUpdateZone: (zone: Zone) => void;
     onDeleteZone: (zoneId: string) => void;
-    editMode: 'view' | 'draw' | 'edit';
-    onEditModeChange: (mode: 'view' | 'draw' | 'edit') => void;
+    editMode: 'view' | 'draw' | 'edit' | 'draw_room';
+    onEditModeChange: (mode: 'view' | 'draw' | 'edit' | 'draw_room') => void;
     drawingPoints: Point[];
     onClearDrawing: () => void;
 }
