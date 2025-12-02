@@ -19,6 +19,7 @@ import { SensorManager } from './components/SensorManager';
 import { FloorPlanEditor } from './components/FloorPlanEditor';
 import { PersonManager } from './components/PersonManager';
 import { PersonSwitcher } from './components/PersonSwitcher';
+import { TimeSlider } from './components/TimeSlider';
 import { HideNSeekWebSocket } from './utils/websocket';
 import {
   Sensor,
@@ -30,6 +31,7 @@ import {
   ZoneEvent,
   FloorPlan,
   Person,
+  PositionRecord,
 } from './types';
 
 // Get Home Assistant connection from global context
@@ -82,6 +84,14 @@ export const App: React.FC = () => {
     message: string;
     severity: 'success' | 'error' | 'info';
   }>({ open: false, message: '', severity: 'info' });
+
+  // History mode state
+  const [historyMode, setHistoryMode] = useState(false);
+  const [currentTime, setCurrentTime] = useState(Date.now() / 1000);
+  const [playbackPlaying, setPlaybackPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [visualizationModes, setVisualizationModes] = useState<string[]>(['live']);
+  const [historicalPositions, setHistoricalPositions] = useState<Record<string, PositionRecord[]>>({});
 
   useEffect(() => {
     const websocket = new HideNSeekWebSocket(CONFIG_ENTRY_ID);
@@ -144,6 +154,40 @@ export const App: React.FC = () => {
       unsubZones();
     };
   }, [ws, connected]);
+
+  // Fetch historical data when visualization modes change
+  useEffect(() => {
+    if (!ws || !connected) return;
+    if (!visualizationModes.includes('trails') && !visualizationModes.includes('heatmap')) {
+      return;
+    }
+
+    const fetchHistoricalData = async () => {
+      const now = Date.now() / 1000;
+      const startTime = now - 24 * 3600; // Last 24 hours
+      const endTime = now;
+
+      try {
+        const histData: Record<string, PositionRecord[]> = {};
+
+        for (const device of devices) {
+          const positions = await ws.getPositionHistory(
+            device.id,
+            startTime,
+            endTime,
+            60 // Downsample to 1 point per minute
+          );
+          histData[device.id] = positions;
+        }
+
+        setHistoricalPositions(histData);
+      } catch (err: any) {
+        console.error('Failed to fetch historical data:', err);
+      }
+    };
+
+    fetchHistoricalData();
+  }, [ws, connected, devices, visualizationModes]);
 
   const showSnackbar = (
     message: string,
@@ -435,6 +479,19 @@ export const App: React.FC = () => {
       </AppBar>
 
       <Container maxWidth={false} sx={{ mt: 3, mb: 3 }}>
+        <TimeSlider
+          minTime={currentTime - 24 * 3600}
+          maxTime={Date.now() / 1000}
+          currentTime={currentTime}
+          onTimeChange={setCurrentTime}
+          playing={playbackPlaying}
+          onPlayPause={() => setPlaybackPlaying(!playbackPlaying)}
+          playbackSpeed={playbackSpeed}
+          onSpeedChange={setPlaybackSpeed}
+          visualizationModes={visualizationModes}
+          onVisualizationModeChange={setVisualizationModes}
+        />
+
         <PersonSwitcher
           persons={persons}
           devices={devices}
@@ -460,6 +517,9 @@ export const App: React.FC = () => {
                 drawingPoints={drawingPoints}
                 floorPlan={floorPlan}
                 showFloorPlan={true}
+                visualizationModes={visualizationModes}
+                historicalPositions={historicalPositions}
+                persons={persons}
               />
             </Paper>
           </Grid>

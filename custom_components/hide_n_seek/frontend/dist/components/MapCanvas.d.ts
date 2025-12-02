@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sensor, TrackedDevice, Zone, Position, Point, FloorPlan } from '../types';
+import { Sensor, TrackedDevice, Zone, Position, Point, FloorPlan, PositionRecord, Person } from '../types';
 interface MapCanvasProps {
     sensors: Sensor[];
     devices: TrackedDevice[];
@@ -12,6 +12,10 @@ interface MapCanvasProps {
     drawingPoints: Point[];
     floorPlan?: FloorPlan;
     showFloorPlan?: boolean;
+    visualizationModes?: string[];
+    historicalPositions?: Record<string, PositionRecord[]>;
+    heatMapData?: Record<string, number>;
+    persons?: Person[];
 }
 export declare const MapCanvas: React.FC<MapCanvasProps>;
 export {};

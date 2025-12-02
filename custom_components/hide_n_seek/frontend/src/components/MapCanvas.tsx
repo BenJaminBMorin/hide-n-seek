@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sensor, TrackedDevice, Zone, Position, Point, FloorPlan } from '../types';
+import { Sensor, TrackedDevice, Zone, Position, Point, FloorPlan, PositionRecord, Person } from '../types';
 
 interface MapCanvasProps {
   sensors: Sensor[];
@@ -13,6 +13,10 @@ interface MapCanvasProps {
   drawingPoints: Point[];
   floorPlan?: FloorPlan;
   showFloorPlan?: boolean;
+  visualizationModes?: string[];
+  historicalPositions?: Record<string, PositionRecord[]>;
+  heatMapData?: Record<string, number>;
+  persons?: Person[];
 }
 
 export const MapCanvas: React.FC<MapCanvasProps> = ({
@@ -27,6 +31,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   drawingPoints,
   floorPlan,
   showFloorPlan = true,
+  visualizationModes = ['live'],
+  historicalPositions = {},
+  heatMapData = {},
+  persons = [],
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [scale, setScale] = useState(50); // pixels per meter
@@ -263,6 +271,93 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     });
   };
 
+  const drawTrails = (ctx: CanvasRenderingContext2D) => {
+    if (!visualizationModes.includes('trails')) return;
+
+    Object.entries(historicalPositions).forEach(([deviceId, positions]) => {
+      if (positions.length < 2) return;
+
+      // Get device or person color
+      const device = devices.find((d) => d.id === deviceId);
+      const person = persons.find((p) => p.default_device_id === deviceId);
+      const color = person?.color || '#2196F3';
+
+      // Draw path
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+
+      const firstPos = worldToScreen(positions[0].x, positions[0].y);
+      ctx.moveTo(firstPos.x, firstPos.y);
+
+      for (let i = 1; i < positions.length; i++) {
+        const pos = worldToScreen(positions[i].x, positions[i].y);
+        ctx.lineTo(pos.x, pos.y);
+      }
+
+      ctx.stroke();
+      ctx.globalAlpha = 1.0;
+
+      // Draw dots at intervals
+      for (let i = 0; i < positions.length; i += Math.max(1, Math.floor(positions.length / 20))) {
+        const pos = worldToScreen(positions[i].x, positions[i].y);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 3, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    });
+  };
+
+  const drawHeatMap = (ctx: CanvasRenderingContext2D) => {
+    if (!visualizationModes.includes('heatmap')) return;
+
+    // Draw heat map as colored grid cells
+    const gridSize = 0.5; // meters
+    const maxValue = Math.max(...Object.values(heatMapData), 1);
+
+    Object.entries(heatMapData).forEach(([key, value]) => {
+      const [x, y] = key.split(',').map(Number);
+      const intensity = value / maxValue;
+
+      // Color gradient: blue -> green -> yellow -> red
+      let r, g, b;
+      if (intensity < 0.25) {
+        // Blue to cyan
+        r = 0;
+        g = Math.floor(intensity * 4 * 255);
+        b = 255;
+      } else if (intensity < 0.5) {
+        // Cyan to green
+        r = 0;
+        g = 255;
+        b = Math.floor((0.5 - intensity) * 4 * 255);
+      } else if (intensity < 0.75) {
+        // Green to yellow
+        r = Math.floor((intensity - 0.5) * 4 * 255);
+        g = 255;
+        b = 0;
+      } else {
+        // Yellow to red
+        r = 255;
+        g = Math.floor((1 - intensity) * 4 * 255);
+        b = 0;
+      }
+
+      const topLeft = worldToScreen(x, y);
+      const bottomRight = worldToScreen(x + gridSize, y + gridSize);
+
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.5)`;
+      ctx.fillRect(
+        topLeft.x,
+        topLeft.y,
+        bottomRight.x - topLeft.x,
+        bottomRight.y - topLeft.y
+      );
+    });
+  };
+
   const render = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -281,8 +376,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     // Draw grid
     drawGrid(ctx, width, height);
 
+    // Draw heat map (before zones)
+    drawHeatMap(ctx);
+
     // Draw zones
     zones.forEach((zone) => drawZone(ctx, zone));
+
+    // Draw trails (before devices so devices are on top)
+    drawTrails(ctx);
 
     // Draw drawing zone if in draw mode (zones or rooms)
     if ((editMode === 'draw' || editMode === 'draw_room') && drawingPoints.length > 0) {
@@ -292,18 +393,20 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     // Draw sensors
     sensors.forEach((sensor) => drawSensor(ctx, sensor));
 
-    // Draw devices
-    devices.forEach((device) => {
-      const position = positions[device.id];
-      if (position) {
-        drawDevice(ctx, device, position);
-      }
-    });
+    // Draw devices (only if in live mode or historical mode without live toggle)
+    if (visualizationModes.includes('live')) {
+      devices.forEach((device) => {
+        const position = positions[device.id];
+        if (position) {
+          drawDevice(ctx, device, position);
+        }
+      });
+    }
   };
 
   useEffect(() => {
     render();
-  }, [sensors, devices, zones, positions, scale, offset, selectedZone, editMode, drawingPoints, floorPlan, showFloorPlan]);
+  }, [sensors, devices, zones, positions, scale, offset, selectedZone, editMode, drawingPoints, floorPlan, showFloorPlan, visualizationModes, historicalPositions, heatMapData, persons]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
