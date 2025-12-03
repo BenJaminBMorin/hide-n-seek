@@ -93,11 +93,6 @@ export const App: React.FC<AppProps> = ({ hass }) => {
       return;
     }
 
-    // Skip if currently loading - prevents duplicate calls
-    if (loading) {
-      return;
-    }
-
     console.log('=== Hide-n-Seek Panel Initializing ===');
     setLoading(true);
 
