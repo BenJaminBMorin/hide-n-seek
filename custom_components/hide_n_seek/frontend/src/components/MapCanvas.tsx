@@ -451,6 +451,24 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     render();
   }, [sensors, devices, zones, positions, scale, offset, selectedZone, editMode, drawingPoints, floorPlan, showFloorPlan, visualizationModes, historicalPositions, heatMapData, persons]);
 
+  // Attach wheel event listener with passive: false to allow preventDefault
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      setScale((prev) => Math.max(10, Math.min(200, prev * delta)));
+    };
+
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
       // Middle click or Ctrl+click for panning
@@ -478,12 +496,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     setIsPanning(false);
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setScale((prev) => Math.max(10, Math.min(200, prev * delta)));
-  };
-
   return (
     <canvas
       ref={canvasRef}
@@ -493,7 +505,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      onWheel={handleWheel}
       style={{
         border: '1px solid #ccc',
         cursor: isPanning ? 'grabbing' : editMode === 'draw' ? 'crosshair' : 'default',
