@@ -595,8 +595,15 @@ export const App: React.FC<AppProps> = ({ hass }) => {
           onSetActiveDevice={handleSetActiveDevice}
         />
 
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={8}>
+        <Box sx={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 400px',
+          gap: 3,
+          '@media (max-width: 900px)': {
+            gridTemplateColumns: '1fr',
+          }
+        }}>
+          <Box>
             <Paper elevation={3} sx={{ p: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Tracking Map
@@ -618,67 +625,55 @@ export const App: React.FC<AppProps> = ({ hass }) => {
                 persons={persons}
               />
             </Paper>
-          </Grid>
+          </Box>
 
-          <Grid item xs={12} sm={4}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <ZoneEditor
-                  zones={zones}
-                  selectedZone={selectedZone}
-                  onSelectZone={setSelectedZone}
-                  onCreateZone={handleCreateZone}
-                  onUpdateZone={handleUpdateZone}
-                  onDeleteZone={handleDeleteZone}
-                  editMode={editMode}
-                  onEditModeChange={setEditMode}
-                  drawingPoints={drawingPoints}
-                  onClearDrawing={handleClearDrawing}
-                />
-              </Grid>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <ZoneEditor
+              zones={zones}
+              selectedZone={selectedZone}
+              onSelectZone={setSelectedZone}
+              onCreateZone={handleCreateZone}
+              onUpdateZone={handleUpdateZone}
+              onDeleteZone={handleDeleteZone}
+              editMode={editMode}
+              onEditModeChange={setEditMode}
+              drawingPoints={drawingPoints}
+              onClearDrawing={handleClearDrawing}
+            />
 
-              <Grid item xs={12}>
-                <DeviceList devices={devices} positions={positions} />
-              </Grid>
+            <DeviceList devices={devices} positions={positions} />
 
-              <Grid item xs={12}>
-                <SensorManager
-                  sensors={sensors}
-                  onAddSensor={handleAddSensor}
-                  onUpdateSensor={handleUpdateSensor}
-                  onDeleteSensor={handleDeleteSensor}
-                />
-              </Grid>
+            <SensorManager
+              sensors={sensors}
+              onAddSensor={handleAddSensor}
+              onUpdateSensor={handleUpdateSensor}
+              onDeleteSensor={handleDeleteSensor}
+            />
 
-              <Grid item xs={12}>
-                <FloorPlanEditor
-                  floorPlan={floorPlan}
-                  onUpdateDimensions={handleUpdateFloorPlanDimensions}
-                  onCreateRoom={handleCreateRoom}
-                  onUpdateRoom={handleUpdateRoom}
-                  onDeleteRoom={handleDeleteRoom}
-                  onCreateWall={handleCreateWall}
-                  onUpdateWall={handleUpdateWall}
-                  onDeleteWall={handleDeleteWall}
-                  onEditModeChange={setEditMode}
-                  editMode={editMode}
-                  drawingPoints={drawingPoints}
-                  onClearDrawing={handleClearDrawing}
-                />
-              </Grid>
+            <FloorPlanEditor
+              floorPlan={floorPlan}
+              onUpdateDimensions={handleUpdateFloorPlanDimensions}
+              onCreateRoom={handleCreateRoom}
+              onUpdateRoom={handleUpdateRoom}
+              onDeleteRoom={handleDeleteRoom}
+              onCreateWall={handleCreateWall}
+              onUpdateWall={handleUpdateWall}
+              onDeleteWall={handleDeleteWall}
+              onEditModeChange={setEditMode}
+              editMode={editMode}
+              drawingPoints={drawingPoints}
+              onClearDrawing={handleClearDrawing}
+            />
 
-              <Grid item xs={12}>
-                <PersonManager
-                  persons={persons}
-                  devices={devices}
-                  onCreatePerson={handleCreatePerson}
-                  onUpdatePerson={handleUpdatePerson}
-                  onDeletePerson={handleDeletePerson}
-                />
-              </Grid>
-            </Grid>
-          </Grid>
-        </Grid>
+            <PersonManager
+              persons={persons}
+              devices={devices}
+              onCreatePerson={handleCreatePerson}
+              onUpdatePerson={handleUpdatePerson}
+              onDeletePerson={handleDeletePerson}
+            />
+          </Box>
+        </Box>
       </Container>
 
       <Snackbar
