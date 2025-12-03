@@ -82,122 +82,84 @@ export const App: React.FC<AppProps> = ({ hass }) => {
   const [visualizationModes, setVisualizationModes] = useState<string[]>(['live']);
   const [historicalPositions, setHistoricalPositions] = useState<Record<string, PositionRecord[]>>({});
 
-  // Track initialization state to prevent duplicate initializations
-  const initializingRef = useRef(false);
-  const initializedRef = useRef(false);
-  const wsRef = useRef<HideNSeekWebSocket | null>(null);
-
   useEffect(() => {
     // Wait for hass object to be available
     if (!hass || !hass.connection) {
-      console.log('Waiting for hass connection...');
-      setLoading(true);
-      setError(null);
       return;
     }
 
-    // Prevent duplicate initializations
-    if (initializingRef.current || initializedRef.current) {
+    // Skip if already connected - prevents re-initialization
+    if (ws && connected) {
       return;
     }
 
-    initializingRef.current = true;
+    // Skip if currently loading - prevents duplicate calls
+    if (loading) {
+      return;
+    }
+
     console.log('=== Hide-n-Seek Panel Initializing ===');
-    console.log('Hass connection available');
+    setLoading(true);
 
-    // FIRST: Find the config entry ID from entity states
     const initializePanel = async () => {
       try {
-        console.log('Step 1: Searching for hide_n_seek entities in states...');
-
         // Find all hide_n_seek entities
         const hideNSeekEntityIds = Object.keys(hass.states).filter(entityId =>
           entityId.includes('hide_n_seek') || entityId.includes('hide-n-seek')
         );
 
-        console.log('Found hide_n_seek entities:', hideNSeekEntityIds);
-
         if (hideNSeekEntityIds.length === 0) {
           throw new Error('No Hide-n-Seek entities found. Please ensure the integration is configured and has created entities.');
         }
 
-        // Try to get config entry ID from the entity registry
+        // Get config entry ID from entity registry
         let configEntryId: string | null = null;
-
-        // Try getting from entity registry
         try {
-          console.log('Step 2: Getting config entry ID from entity registry...');
           const entityInfo: any = await hass.callWS({
             type: 'config/entity_registry/get',
             entity_id: hideNSeekEntityIds[0]
           });
           if (entityInfo && entityInfo.config_entry_id) {
             configEntryId = entityInfo.config_entry_id;
-            console.log('Found config_entry_id:', configEntryId);
           }
         } catch (err) {
-          console.log('Could not get entity from registry:', err);
+          console.error('Could not get entity from registry:', err);
         }
 
         if (!configEntryId) {
-          throw new Error('Could not determine config entry ID. Please report this issue with the console logs.');
+          throw new Error('Could not determine config entry ID');
         }
 
-        console.log('Step 3: Creating WebSocket wrapper...');
         const websocket = new HideNSeekWebSocket(hass, configEntryId);
-        wsRef.current = websocket;
-
         await websocket.connect();
-        console.log('Step 4: Connection established');
 
-        setConnected(true);
-        setWs(websocket);
-        setError(null);
-
-        console.log('Step 5: Fetching initial data...');
         const [mapData, floorPlanData, personsData] = await Promise.all([
           websocket.getMapData(),
           websocket.getFloorPlan(),
           websocket.getPersons(),
         ]);
 
-        console.log('Step 6: Data received, updating UI...');
         setSensors(mapData.sensors);
         setDevices(mapData.devices);
         setZones(mapData.zones);
         setPositions(mapData.positions);
         setFloorPlan(floorPlanData);
         setPersons(personsData);
+        setWs(websocket);
+        setConnected(true);
+        setError(null);
         setLoading(false);
 
         console.log('=== Panel Initialized Successfully ===');
-        initializedRef.current = true;
-
-        return websocket;
       } catch (err: any) {
-        console.error('=== Initialization Failed ===');
-        console.error('Error:', err);
+        console.error('=== Initialization Failed ===', err);
         setError(err.message || 'Failed to initialize panel');
         setLoading(false);
-        initializingRef.current = false;
-        throw err;
       }
     };
 
-    initializePanel().catch(() => {
-      // Error already handled in initializePanel
-    });
-
-    return () => {
-      // Cleanup on unmount
-      if (wsRef.current && typeof wsRef.current.disconnect === 'function') {
-        console.log('Cleaning up WebSocket connection...');
-        wsRef.current.disconnect();
-        wsRef.current = null;
-      }
-      initializedRef.current = false;
-      initializingRef.current = false;
-    };
+    initializePanel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hass?.connection]);
 
   useEffect(() => {
