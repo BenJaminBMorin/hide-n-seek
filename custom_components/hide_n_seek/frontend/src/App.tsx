@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Box,
-  Container,
   Grid,
   Paper,
   Typography,
@@ -574,7 +573,11 @@ export const App: React.FC<AppProps> = ({ hass }) => {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth={false} sx={{ mt: 3, mb: 3 }}>
+      <div style={{
+        padding: '24px',
+        width: '100%',
+        boxSizing: 'border-box',
+      }}>
         <TimeSlider
           minTime={currentTime - 24 * 3600}
           maxTime={Date.now() / 1000}
@@ -596,12 +599,18 @@ export const App: React.FC<AppProps> = ({ hass }) => {
         />
 
         <div style={{
-          display: 'flex',
+          display: 'flex !important' as any,
+          flexDirection: 'row !important' as any,
           gap: '24px',
           width: '100%',
           alignItems: 'flex-start',
+          flexWrap: 'nowrap',
         }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            flex: '1 1 auto',
+            minWidth: '600px',
+            maxWidth: 'calc(100% - 424px)',
+          }}>
             <Paper elevation={3} sx={{ p: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Tracking Map
@@ -625,7 +634,16 @@ export const App: React.FC<AppProps> = ({ hass }) => {
             </Paper>
           </div>
 
-          <div style={{ width: '400px', display: 'flex', flexDirection: 'column', gap: '16px', flexShrink: 0 }}>
+          <div style={{
+            width: '400px',
+            minWidth: '400px',
+            maxWidth: '400px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            flexShrink: 0,
+            flexGrow: 0,
+          }}>
             <ZoneEditor
               zones={zones}
               selectedZone={selectedZone}
@@ -672,7 +690,7 @@ export const App: React.FC<AppProps> = ({ hass }) => {
             />
           </div>
         </div>
-      </Container>
+      </div>
 
       <Snackbar
         open={snackbar.open}
