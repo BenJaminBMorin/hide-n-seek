@@ -595,12 +595,13 @@ export const App: React.FC<AppProps> = ({ hass }) => {
           onSetActiveDevice={handleSetActiveDevice}
         />
 
-        <Box style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 400px',
+        <div style={{
+          display: 'flex',
           gap: '24px',
+          width: '100%',
+          alignItems: 'flex-start',
         }}>
-          <Box style={{ minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <Paper elevation={3} sx={{ p: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Tracking Map
@@ -622,9 +623,9 @@ export const App: React.FC<AppProps> = ({ hass }) => {
                 persons={persons}
               />
             </Paper>
-          </Box>
+          </div>
 
-          <Box style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
+          <div style={{ width: '400px', display: 'flex', flexDirection: 'column', gap: '16px', flexShrink: 0 }}>
             <ZoneEditor
               zones={zones}
               selectedZone={selectedZone}
@@ -669,8 +670,8 @@ export const App: React.FC<AppProps> = ({ hass }) => {
               onUpdatePerson={handleUpdatePerson}
               onDeletePerson={handleDeletePerson}
             />
-          </Box>
-        </Box>
+          </div>
+        </div>
       </Container>
 
       <Snackbar
