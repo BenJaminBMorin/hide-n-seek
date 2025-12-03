@@ -595,15 +595,12 @@ export const App: React.FC<AppProps> = ({ hass }) => {
           onSetActiveDevice={handleSetActiveDevice}
         />
 
-        <Box sx={{
+        <Box style={{
           display: 'grid',
           gridTemplateColumns: '1fr 400px',
-          gap: 3,
-          '@media (max-width: 900px)': {
-            gridTemplateColumns: '1fr',
-          }
+          gap: '24px',
         }}>
-          <Box>
+          <Box style={{ minWidth: 0 }}>
             <Paper elevation={3} sx={{ p: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Tracking Map
@@ -627,7 +624,7 @@ export const App: React.FC<AppProps> = ({ hass }) => {
             </Paper>
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
             <ZoneEditor
               zones={zones}
               selectedZone={selectedZone}
