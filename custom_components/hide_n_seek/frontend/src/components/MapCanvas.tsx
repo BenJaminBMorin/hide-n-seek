@@ -509,6 +509,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         border: '1px solid #ccc',
         cursor: isPanning ? 'grabbing' : editMode === 'draw' ? 'crosshair' : 'default',
         backgroundColor: '#fff',
+        width: '100%',
+        height: 'auto',
+        maxWidth: '1200px',
+        display: 'block',
       }}
     />
   );
